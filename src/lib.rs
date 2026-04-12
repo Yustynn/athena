@@ -2,6 +2,7 @@ pub mod error;
 pub mod feedback;
 pub mod fragment;
 pub mod ids;
+pub mod orientation;
 pub mod packet;
 pub mod purpose;
 pub mod storage;
