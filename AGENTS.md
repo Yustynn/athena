@@ -113,18 +113,18 @@ bd close <id>         # Complete work
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
 
-## Dogfooding Workflow (MVP Feedback Loop)
+## Athena Check Workflow
 
-Run this before handoff to verify the current feedback loop behavior:
+Run this before handoff to verify core Athena persistence and feedback-loop behavior:
 
 ```bash
-scripts/dogfood_loop.sh
+scripts/athena_check.sh
 ```
 
 What it does:
-- runs targeted tests for feedback scoring and loop behavior
-- runs `cargo run --bin dogfood` to execute one persisted tracer run plus one feedback-loop run
-- prints first vs second packet fragment IDs so you can verify loop-driven packet changes
+- runs targeted tests for feedback scoring
+- runs feedback-loop packet-change coverage
+- runs Dolt persistence e2e coverage
 
 Optional git hook setup (recommended):
 
@@ -132,4 +132,4 @@ Optional git hook setup (recommended):
 git config core.hooksPath .githooks
 ```
 
-This enables the repository pre-push hook at `.githooks/pre-push`, which runs `scripts/dogfood_loop.sh`.
+This enables the repository pre-push hook at `.githooks/pre-push`, which runs `scripts/athena_check.sh`.

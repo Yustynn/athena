@@ -123,7 +123,7 @@ pub fn run_feedback_loop(
                 } else {
                     FragmentVerdict::Helped
                 },
-                reason: Some("dogfood feedback loop".to_owned()),
+                reason: Some("feedback loop check".to_owned()),
             })
             .collect(),
     };

@@ -1,16 +1,16 @@
 Athena local Dolt state
 
-- `db/`: tracked Dolt repository for Athena persisted memory and dogfood runs
+- `db/`: tracked Dolt repository for Athena persisted memory
 - `.dolt-home/`: untracked Dolt CLI home used for local command state and telemetry files
 
-Default dogfood path:
+Inspect current Athena tables:
 
 ```bash
-cargo run --quiet --bin dogfood
+HOME="$PWD/.athena/.dolt-home" dolt sql -q "show tables" -r json
 ```
 
-Isolated temp repo override:
+Inspect persisted purposes:
 
 ```bash
-ATHENA_DOGFOOD_DB_DIR="$(mktemp -d "${TMPDIR:-/tmp}/athena-dogfood.XXXXXX")" cargo run --quiet --bin dogfood
+HOME="$PWD/.athena/.dolt-home" dolt sql -q "select purpose_id, statement, success_criteria, status from purposes order by purpose_id desc;" -r json
 ```

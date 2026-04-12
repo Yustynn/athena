@@ -2,4 +2,4 @@
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-"$REPO_ROOT/scripts/dogfood_loop.sh"
+"$REPO_ROOT/scripts/athena_check.sh"
