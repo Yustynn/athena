@@ -34,6 +34,9 @@ Install Codex MCP integration:
 bash scripts/install_codex_athena_mcp.sh
 ```
 
+This prebuilds `athena-mcp` into dedicated target dir, then registers MCP server with same `CARGO_TARGET_DIR`.
+Purpose: avoid startup hangs when normal repo Cargo work holds default target-dir lock.
+
 Install stable + dev MCP servers:
 
 ```bash

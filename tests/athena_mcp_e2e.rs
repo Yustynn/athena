@@ -25,8 +25,8 @@ struct McpSession {
 
 impl McpSession {
     fn new(mode: &str) -> Self {
-        let mut child = Command::new("cargo")
-            .args(["run", "--quiet", "--bin", "athena-mcp", "--", mode])
+        let mut child = Command::new(env!("CARGO_BIN_EXE_athena-mcp"))
+            .arg(mode)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
@@ -103,7 +103,11 @@ impl McpSession {
         let mut content_length = None;
         loop {
             let mut line = String::new();
-            self.stdout.read_line(&mut line).unwrap();
+            let read = self.stdout.read_line(&mut line).unwrap();
+            if read == 0 {
+                let status = self.child.wait().unwrap();
+                panic!("mcp child exited before response: {status}");
+            }
             if line == "\r\n" {
                 break;
             }
