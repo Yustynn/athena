@@ -12,10 +12,16 @@ if [ ! -f "$HOME/.bashrc" ] || ! grep -Fqx "$path_line" "$HOME/.bashrc"; then
   printf '\n%s\n' "$path_line" >> "$HOME/.bashrc"
 fi
 
-if command -v bd >/dev/null 2>&1; then
-  bd version
-  exit 0
+if ! command -v bd >/dev/null 2>&1; then
+  curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
 fi
 
-curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
 bd version
+
+if command -v codex >/dev/null 2>&1; then
+  if [[ "${ATHENA_INSTALL_DEV_MCP:-0}" == "1" ]]; then
+    bash scripts/install_codex_athena_mcp.sh --with-dev
+  else
+    bash scripts/install_codex_athena_mcp.sh
+  fi
+fi

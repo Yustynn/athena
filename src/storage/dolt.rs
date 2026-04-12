@@ -142,6 +142,23 @@ impl DoltStorage {
         }))
     }
 
+    pub fn latest_purpose(&self) -> Result<Option<Purpose>, AthenaError> {
+        let rows = self.query_json_rows(
+            "SELECT purpose_id, statement, success_criteria, status FROM purposes ORDER BY purpose_id DESC LIMIT 1;",
+        )?;
+
+        let Some(row) = rows.first() else {
+            return Ok(None);
+        };
+
+        Ok(Some(Purpose {
+            purpose_id: PurposeId::new(json_str(row, "purpose_id")?),
+            statement: json_str(row, "statement")?,
+            success_criteria: json_str(row, "success_criteria")?,
+            status: purpose_status_from_db(&json_str(row, "status")?)?,
+        }))
+    }
+
     pub fn insert_packet(&self, packet: &PurposePacket) -> Result<(), AthenaError> {
         self.exec(&format!(
             "INSERT INTO packets (packet_id, purpose_id)
@@ -202,6 +219,22 @@ impl DoltStorage {
             purpose_id,
             fragments,
         }))
+    }
+
+    pub fn latest_packet_for_purpose(
+        &self,
+        purpose_id: &PurposeId,
+    ) -> Result<Option<PurposePacket>, AthenaError> {
+        let rows = self.query_json_rows(&format!(
+            "SELECT packet_id FROM packets WHERE purpose_id = {} ORDER BY packet_id DESC LIMIT 1;",
+            sql_str(&purpose_id.0)
+        ))?;
+
+        let Some(row) = rows.first() else {
+            return Ok(None);
+        };
+
+        self.get_packet(&PacketId::new(json_str(row, "packet_id")?))
     }
 
     pub fn insert_feedback(&self, feedback: &FeedbackEvent) -> Result<(), AthenaError> {

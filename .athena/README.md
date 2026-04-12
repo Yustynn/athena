@@ -3,6 +3,8 @@ Athena local Dolt state
 - `db/`: tracked Dolt repository for Athena persisted memory
 - `fragments.json`: tracked base fragments Athena assembles into packets
 - `.dolt-home/`: untracked Dolt CLI home used for local command state and telemetry files
+- stable Codex MCP server: persisted tools backed by `.athena/db`
+- dev Codex MCP server: stateless experimentation tools
 
 Start Athena loop:
 
@@ -25,6 +27,22 @@ echo '{"fragment_feedback":[...],"new_fragments":[...]}' | cargo run --quiet --b
   --packet-id packet-... \
   --outcome partial
 ```
+
+Install Codex MCP integration:
+
+```bash
+bash scripts/install_codex_athena_mcp.sh
+```
+
+Install stable + dev MCP servers:
+
+```bash
+bash scripts/install_codex_athena_mcp.sh --with-dev
+```
+
+Recommendation:
+- use `athena` MCP server for normal Codex work
+- use `athena-dev` MCP server only when experimenting with packet/orientation behavior
 
 Inspect current Athena tables:
 

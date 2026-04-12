@@ -34,6 +34,16 @@ Tracked defaults:
 - purposes, packets, feedback persist in `.athena/db`
 - base fragments load from `.athena/fragments.json`
 
+Codex MCP integration:
+
+```bash
+bash scripts/install_codex_athena_mcp.sh
+```
+
+Default:
+- use stable `athena` MCP server for persisted repo work
+- use `athena-dev` only for experimental stateless packet/orientation calls
+
 Repo now exposes minimal Athena stdio adapter for purpose -> packet -> feedback loop:
 
 ```bash

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "athena": {
+      "command": "cargo",
+      "args": ["run", "--quiet", "--manifest-path", "./Cargo.toml", "--bin", "athena-mcp", "--", "stable"]
+    },
+    "athena-dev": {
+      "command": "cargo",
+      "args": ["run", "--quiet", "--manifest-path", "./Cargo.toml", "--bin", "athena-mcp", "--", "dev"]
+    }
+  }
+}
