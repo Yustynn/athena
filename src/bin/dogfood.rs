@@ -5,6 +5,10 @@ fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fragments.json")
 }
 
+fn tracked_db_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".athena/db")
+}
+
 fn db_path_from_env(override_path: Option<&str>) -> PathBuf {
     if let Some(path) = override_path {
         if !path.trim().is_empty() {
@@ -12,11 +16,11 @@ fn db_path_from_env(override_path: Option<&str>) -> PathBuf {
         }
     }
 
-    std::env::temp_dir().join("athena-dogfood.sqlite")
+    tracked_db_path()
 }
 
 fn db_path() -> PathBuf {
-    let override_path = std::env::var("ATHENA_DOGFOOD_DB").ok();
+    let override_path = std::env::var("ATHENA_DOGFOOD_DB_DIR").ok();
     db_path_from_env(override_path.as_deref())
 }
 
@@ -53,34 +57,34 @@ fn main() {
         .collect();
 
     println!("persisted packet id: {}", persisted.packet.packet_id);
-    println!("dogfood db: {}", db.display());
+    println!("dogfood repo: {}", db.display());
     println!("first packet fragments: {:?}", first_ids);
     println!("second packet fragments: {:?}", second_ids);
 }
 
 #[cfg(test)]
 mod tests {
-    use super::db_path_from_env;
+    use super::{db_path_from_env, tracked_db_path};
 
     #[test]
     fn db_path_uses_override_when_non_empty() {
-        let result = db_path_from_env(Some("/tmp/custom-dogfood.sqlite"));
+        let result = db_path_from_env(Some("/tmp/custom-dogfood-repo"));
         assert_eq!(
             result.to_string_lossy().to_string(),
-            "/tmp/custom-dogfood.sqlite"
+            "/tmp/custom-dogfood-repo"
         );
     }
 
     #[test]
     fn db_path_ignores_empty_or_whitespace_override() {
-        let expected = std::env::temp_dir().join("athena-dogfood.sqlite");
+        let expected = tracked_db_path();
         assert_eq!(db_path_from_env(Some("")).as_path(), expected.as_path());
         assert_eq!(db_path_from_env(Some("   ")).as_path(), expected.as_path());
     }
 
     #[test]
     fn db_path_defaults_when_override_missing() {
-        let expected = std::env::temp_dir().join("athena-dogfood.sqlite");
+        let expected = tracked_db_path();
         assert_eq!(db_path_from_env(None).as_path(), expected.as_path());
     }
 }

@@ -3,7 +3,7 @@ use athena_v2::fragment::{Fragment, FragmentKind};
 use athena_v2::ids::{FeedbackId, FragmentId, PacketId, PurposeId};
 use athena_v2::packet::PurposePacket;
 use athena_v2::purpose::{Purpose, PurposeStatus};
-use athena_v2::storage::SqliteStorage;
+use athena_v2::storage::DoltStorage;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -60,18 +60,18 @@ fn sample_feedback() -> FeedbackEvent {
     }
 }
 
-fn unique_db_path() -> PathBuf {
+fn unique_repo_path() -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!("athena-{nanos}.sqlite"))
+    std::env::temp_dir().join(format!("athena-dolt-{nanos}"))
 }
 
 #[test]
-fn sqlite_crud_round_trip_for_core_objects() {
-    let db_path = unique_db_path();
-    let storage = SqliteStorage::open(&db_path).unwrap();
+fn dolt_crud_round_trip_for_core_objects() {
+    let repo_path = unique_repo_path();
+    let storage = DoltStorage::open(&repo_path).unwrap();
 
     let purpose = sample_purpose();
     storage.insert_purpose(&purpose).unwrap();
@@ -96,9 +96,9 @@ fn sqlite_crud_round_trip_for_core_objects() {
 }
 
 #[test]
-fn sqlite_fragment_node_is_immutable_and_edges_link_nodes() {
-    let db_path = unique_db_path();
-    let storage = SqliteStorage::open(&db_path).unwrap();
+fn dolt_fragment_node_is_immutable_and_edges_link_nodes() {
+    let repo_path = unique_repo_path();
+    let storage = DoltStorage::open(&repo_path).unwrap();
 
     storage
         .insert_fragment_node(

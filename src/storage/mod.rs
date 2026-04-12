@@ -1,3 +1,3 @@
-pub mod sqlite;
+pub mod dolt;
 
-pub use sqlite::SqliteStorage;
+pub use dolt::DoltStorage;

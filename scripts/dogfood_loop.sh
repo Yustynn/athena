@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DOGFOOD_DB="$(mktemp "${TMPDIR:-/tmp}/athena-dogfood.XXXXXX.sqlite")"
-trap 'rm -f "$DOGFOOD_DB"' EXIT
+DOGFOOD_DB_DIR="$(mktemp -d "${TMPDIR:-/tmp}/athena-dogfood.XXXXXX")"
+trap 'rm -rf "$DOGFOOD_DB_DIR"' EXIT
 
 cargo test -q --test feedback_scoring
 cargo test -q --test feedback_loop_e2e
 
-DOGFOOD_OUTPUT="$(ATHENA_DOGFOOD_DB="$DOGFOOD_DB" cargo run --quiet --bin dogfood)"
+DOGFOOD_OUTPUT="$(ATHENA_DOGFOOD_DB_DIR="$DOGFOOD_DB_DIR" cargo run --quiet --bin dogfood)"
 printf '%s\n' "$DOGFOOD_OUTPUT"
 
 FIRST_LINE="$(printf '%s\n' "$DOGFOOD_OUTPUT" | rg -m1 '^first packet fragments:' || true)"

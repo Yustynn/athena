@@ -1,6 +1,12 @@
 
 # Beads / Dolt files (added by bd init)
 .dolt/
+!.athena/
+!.athena/db/
+!.athena/db/.dolt/
+!.athena/db/.dolt/**
+.athena/db/.dolt/stats/
+.athena/.dolt-home/
 *.db
 .beads-credential-key
 target/

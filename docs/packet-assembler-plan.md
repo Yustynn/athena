@@ -127,7 +127,7 @@ Tests:
 - unit: packet slot fill from fixed candidate set
 - unit: exhaustive `fragment_feedback[]` invariant
 
-## Slice 2: SQLite Persistence
+## Slice 2: Dolt Persistence
 
 Goal:
 
@@ -142,7 +142,7 @@ Tests:
 
 - unit: CRUD per table
 - unit: immutable node insertion + edge linking
-- e2e: tracer bullet using SQLite instead of fixture-only memory
+- e2e: tracer bullet using Dolt instead of fixture-only memory
 
 ## Slice 3: Heuristic Candidate Fetch + Rank
 
@@ -343,7 +343,7 @@ src/
     prompt.rs
   storage/
     mod.rs
-    sqlite.rs
+    dolt.rs
   tests/
     fixtures/
 ```
@@ -352,7 +352,7 @@ src/
 
 1. define core Rust types
 2. add in-memory tracer bullet test
-3. add SQLite persistence
+3. add Dolt persistence
 4. implement heuristic packet assembly
 5. implement orientation/correction
 6. implement feedback ingestion + graph update

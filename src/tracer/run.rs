@@ -4,12 +4,13 @@ use crate::feedback::{
     validate_feedback,
 };
 use crate::fragment::load_fragments;
-use crate::ids::{FeedbackId, PurposeId};
+use crate::ids::{FeedbackId, PacketId, PurposeId};
 use crate::orientation::{OrientationResponse, check_orientation};
 use crate::packet::{PurposePacket, assemble_packet, assemble_packet_with_scores};
 use crate::purpose::{Purpose, PurposeStatus};
-use crate::storage::SqliteStorage;
+use crate::storage::DoltStorage;
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TracerResult {
@@ -80,11 +81,14 @@ pub fn run_tracer_persisted(
     fixture_path: impl AsRef<Path>,
     db_path: impl AsRef<Path>,
 ) -> Result<TracerResult, AthenaError> {
-    let result = run_tracer(prompt, success_criteria, fixture_path)?;
-    let storage = SqliteStorage::open(db_path)?;
+    let mut result = run_tracer(prompt, success_criteria, fixture_path)?;
+    assign_persisted_ids(&mut result);
+
+    let storage = DoltStorage::open(db_path)?;
     storage.insert_purpose(&result.purpose)?;
     storage.insert_packet(&result.packet)?;
     storage.insert_feedback(&result.feedback)?;
+    storage.commit_all(&format!("Persist tracer run {}", result.purpose.purpose_id))?;
     Ok(result)
 }
 
@@ -189,4 +193,25 @@ pub fn run_orientation_loop(
         correction_applied,
         second_response,
     })
+}
+
+fn assign_persisted_ids(result: &mut TracerResult) {
+    let purpose_id = PurposeId::new(unique_id("purpose"));
+    let packet_id = PacketId::new(unique_id("packet"));
+    let feedback_id = FeedbackId::new(unique_id("feedback"));
+
+    result.purpose.purpose_id = purpose_id.clone();
+    result.packet.purpose_id = purpose_id.clone();
+    result.feedback.purpose_id = purpose_id;
+    result.packet.packet_id = packet_id.clone();
+    result.feedback.packet_id = packet_id;
+    result.feedback.feedback_id = feedback_id;
+}
+
+fn unique_id(prefix: &str) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock should be after epoch")
+        .as_nanos();
+    format!("{prefix}-{nanos}")
 }
