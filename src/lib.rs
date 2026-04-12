@@ -4,6 +4,7 @@ pub mod fragment;
 pub mod ids;
 pub mod orientation;
 pub mod packet;
+pub mod protocol;
 pub mod purpose;
 pub mod storage;
 pub mod tracer;

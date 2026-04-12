@@ -20,6 +20,28 @@ Use this repo script in Codex cloud environment setup:
 bash scripts/codex_cloud_setup.sh
 ```
 
+## Athena Session Loop
+
+Repo now exposes minimal Athena stdio adapter for purpose -> packet -> feedback loop:
+
+```bash
+echo '{"kind":"assemble_packet","prompt":"...","success_criteria":"..."}' | cargo run --quiet --bin athena-stdio
+```
+
+To evaluate orientation:
+
+```bash
+echo '{"kind":"check_orientation","purpose":{...},"packet":{...},"response":{...}}' | cargo run --quiet --bin athena-stdio
+```
+
+To apply exhaustive fragment feedback and get next packet:
+
+```bash
+echo '{"kind":"apply_feedback","purpose":{...},"packet":{...},"feedback":{...}}' | cargo run --quiet --bin athena-stdio
+```
+
+If you expect Athena guidance during repo work, run adapter explicitly. Nothing auto-injects packet data into chat session.
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
