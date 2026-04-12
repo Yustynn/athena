@@ -22,7 +22,49 @@ bash scripts/codex_cloud_setup.sh
 
 ## Athena Session Loop
 
-Primary persisted Athena CLI:
+Use repo bash wrappers. Do not use Athena MCP for normal Codex work.
+
+Persisted wrapper:
+
+```bash
+scripts/athena latest-state
+scripts/athena ensure-purpose "..." "..."
+scripts/athena update "..." "..."
+scripts/athena feedback partial feedback.json
+```
+
+Tracked defaults:
+- purposes, packets, feedback persist in `.athena/db`
+- base fragments load from `.athena/fragments.json`
+- wrapper session ids persist in untracked `.athena/session.json`
+
+Stateless dev wrapper:
+
+```bash
+scripts/athena-dev packet "..." "..."
+scripts/athena-dev check-orientation request.json
+scripts/athena-dev apply-feedback request.json
+```
+
+Default:
+- use `scripts/athena` for persisted repo work
+- use `scripts/athena-dev` only for experimental stateless packet/orientation calls
+
+Usage rules:
+- at start of substantive work, call `scripts/athena latest-state` first
+- if no active purpose fits, call `scripts/athena ensure-purpose "..." "..."`
+- if scope or done condition changes materially, update purpose before continuing
+- after verification or learning, apply Athena feedback for packet used during work
+- prefer wrapper defaults over manual purpose/packet id copying; wrappers reuse `.athena/session.json`
+- only write `new_fragments` for durable reusable knowledge, not transient task chatter
+- durable reusable knowledge includes implementation lessons, not only product doctrine
+- add `new_fragments` when session produces reusable lessons about storage access, performance limits, caching, polling, state-model distinctions, observability, or failure modes
+- heuristic: if answer to "what should future agent do differently?" is non-trivial and likely reusable, write fragment
+- do not store raw stack traces, one-off command output, ports, or transient debugging chatter; do store stable conclusions extracted from them
+- if Athena output conflicts with repo reality or tests, trust repo reality first, then write corrective feedback
+- `scripts/athena-dev` is for experiments only. Do not write its outputs into canonical Athena memory unless tests pass or user explicitly approves promotion
+
+Raw low-level commands stay available for debugging:
 
 ```bash
 cargo run --quiet --bin athena -- purpose create --statement "..." --success-criteria "..."
@@ -30,31 +72,7 @@ cargo run --quiet --bin athena -- purpose update --purpose-id purpose-... --stat
 echo '{"fragment_feedback":[...],"new_fragments":[...]}' | cargo run --quiet --bin athena -- feedback apply --purpose-id purpose-... --packet-id packet-... --outcome partial
 ```
 
-Tracked defaults:
-- purposes, packets, feedback persist in `.athena/db`
-- base fragments load from `.athena/fragments.json`
-
-Codex MCP integration:
-
-```bash
-bash scripts/install_codex_athena_mcp.sh
-```
-
-Default:
-- use stable `athena` MCP server for persisted repo work
-- use `athena-dev` only for experimental stateless packet/orientation calls
-
-Usage rules:
-- prefer stable `athena` MCP tools over CLI when Codex can call them directly
-- fall back to Athena CLI only if MCP is unavailable
-- at start of substantive work, call latest-state first; if no active purpose fits, create one
-- if scope or done condition changes materially, update purpose before continuing
-- after verification or learning, apply Athena feedback for packet used during work
-- only write `new_fragments` for durable reusable knowledge, not transient task chatter
-- if Athena output conflicts with repo reality or tests, trust repo reality first, then write corrective feedback
-- `athena-dev` is for experiments only. Do not write its outputs into canonical Athena memory unless tests pass or user explicitly approves promotion
-
-Repo now exposes minimal Athena stdio adapter for purpose -> packet -> feedback loop:
+Repo also exposes minimal Athena stdio adapter for purpose -> packet -> feedback loop:
 
 ```bash
 echo '{"kind":"assemble_packet","prompt":"...","success_criteria":"..."}' | cargo run --quiet --bin athena-stdio
@@ -72,7 +90,7 @@ To apply exhaustive fragment feedback and get next packet:
 echo '{"kind":"apply_feedback","purpose":{...},"packet":{...},"feedback":{...}}' | cargo run --quiet --bin athena-stdio
 ```
 
-If you expect Athena guidance during repo work, run adapter explicitly. Nothing auto-injects packet data into chat session.
+If you expect Athena guidance during repo work, run wrapper or adapter explicitly. Nothing auto-injects packet data into chat session.
 
 ## Non-Interactive Shell Commands
 
@@ -136,7 +154,7 @@ bd close <id>         # Complete work
    ```
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+7. **Session close** - Provide context for next session and ask: "What durable lessons from this session would change future implementation choices?" Convert answer into Athena `new_fragments`
 
 **CRITICAL RULES:**
 - Work is NOT complete until `git push` succeeds
@@ -147,7 +165,7 @@ bd close <id>         # Complete work
 
 ## Athena Check Workflow
 
-Run this before handoff to verify core Athena persistence and feedback-loop behavior:
+Run this before session close to verify core Athena persistence and feedback-loop behavior:
 
 ```bash
 scripts/athena_check.sh
