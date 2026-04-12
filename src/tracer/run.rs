@@ -5,6 +5,7 @@ use crate::feedback::{
 };
 use crate::fragment::load_fragments;
 use crate::ids::{FeedbackId, PurposeId};
+use crate::orientation::{OrientationResponse, check_orientation};
 use crate::packet::{PurposePacket, assemble_packet, assemble_packet_with_scores};
 use crate::purpose::{Purpose, PurposeStatus};
 use crate::storage::SqliteStorage;
@@ -15,6 +16,13 @@ pub struct TracerResult {
     pub purpose: Purpose,
     pub packet: PurposePacket,
     pub feedback: FeedbackEvent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrientationLoopResult {
+    pub first_response: OrientationResponse,
+    pub correction_applied: bool,
+    pub second_response: OrientationResponse,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,5 +136,57 @@ pub fn run_feedback_loop(
         feedback,
         fragment_scores,
         second_packet,
+    })
+}
+
+pub fn run_orientation_loop(
+    prompt: &str,
+    success_criteria: &str,
+    fixture_path: impl AsRef<Path>,
+) -> Result<OrientationLoopResult, AthenaError> {
+    let purpose = Purpose {
+        purpose_id: PurposeId::new("purpose-1"),
+        statement: prompt.to_owned(),
+        success_criteria: success_criteria.to_owned(),
+        status: PurposeStatus::Active,
+    };
+
+    let fragments = load_fragments(fixture_path)?;
+    let packet = assemble_packet(&purpose, &fragments)?;
+
+    let first_response = OrientationResponse {
+        purpose_id: purpose.purpose_id.clone(),
+        packet_id: packet.packet_id.clone(),
+        best_path: "Draft plan quickly".to_owned(),
+        addressed_constraints: vec![],
+        unresolved_questions: vec!["Did we satisfy all constraints?".to_owned()],
+    };
+
+    let correction = check_orientation(&purpose, &packet, &first_response);
+
+    let correction_applied = correction.is_some();
+
+    let second_response = if let Some(correction) = correction {
+        let coverage = correction
+            .missing_constraints
+            .iter()
+            .map(|constraint| format!("include {constraint}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        OrientationResponse {
+            purpose_id: purpose.purpose_id.clone(),
+            packet_id: packet.packet_id.clone(),
+            best_path: format!("Draft plan, then {coverage}"),
+            addressed_constraints: correction.missing_constraints.clone(),
+            unresolved_questions: Vec::new(),
+        }
+    } else {
+        first_response.clone()
+    };
+
+    Ok(OrientationLoopResult {
+        first_response,
+        correction_applied,
+        second_response,
     })
 }
