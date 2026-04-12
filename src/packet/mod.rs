@@ -1,5 +1,5 @@
 pub mod assemble;
 pub mod types;
 
-pub use assemble::assemble_packet;
+pub use assemble::{assemble_packet, assemble_packet_with_scores};
 pub use types::PurposePacket;

@@ -82,3 +82,24 @@ bd close <id>         # Complete work
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
+
+## Dogfooding Workflow (MVP Feedback Loop)
+
+Run this before handoff to verify the current feedback loop behavior:
+
+```bash
+scripts/dogfood_loop.sh
+```
+
+What it does:
+- runs targeted tests for feedback scoring and loop behavior
+- runs `cargo run --bin dogfood` to execute one persisted tracer run plus one feedback-loop run
+- prints first vs second packet fragment IDs so you can verify loop-driven packet changes
+
+Optional git hook setup (recommended):
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This enables the repository pre-push hook at `.githooks/pre-push`, which runs `scripts/dogfood_loop.sh`.
