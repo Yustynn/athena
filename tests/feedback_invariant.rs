@@ -14,12 +14,17 @@ fn packet() -> PurposePacket {
             Fragment {
                 fragment_id: FragmentId::new("f1"),
                 kind: FragmentKind::Doctrine,
-                text: "Keep runtime deterministic.".into(),
+                summary: "Keep runtime deterministic.".into(),
+                full_text:
+                    "Keep runtime deterministic. Favor stable outputs from identical inputs.".into(),
             },
             Fragment {
                 fragment_id: FragmentId::new("f2"),
                 kind: FragmentKind::Pitfall,
-                text: "Do not skip fragment feedback.".into(),
+                summary: "Do not skip fragment feedback.".into(),
+                full_text:
+                    "Do not skip fragment feedback. Record verdict for every fragment in packet."
+                        .into(),
             },
         ],
     }

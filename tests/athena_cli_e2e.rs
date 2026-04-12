@@ -209,7 +209,8 @@ fn feedback_apply_persists_feedback_new_fragments_and_next_packet() {
         "new_fragments": [
             {
                 "kind": "doctrine",
-                "text": "Use tracked Dolt repo for Athena memory."
+                "summary": "Use tracked Dolt repo for Athena memory.",
+                "full_text": "Use tracked Dolt repo for Athena memory. Keep persisted Athena state in tracked Dolt tables so fragment evolution and packet history stay inspectable."
             }
         ]
     })
@@ -247,8 +248,12 @@ fn feedback_apply_persists_feedback_new_fragments_and_next_packet() {
     assert_eq!(created_fragments.len(), 1);
     assert_eq!(created_fragment.kind, FragmentKind::Doctrine);
     assert_eq!(
-        created_fragment.text,
+        created_fragment.summary,
         "Use tracked Dolt repo for Athena memory."
+    );
+    assert_eq!(
+        created_fragment.full_text,
+        "Use tracked Dolt repo for Athena memory. Keep persisted Athena state in tracked Dolt tables so fragment evolution and packet history stay inspectable."
     );
     assert!(created_fragment.fragment_id.0.starts_with("fragment-"));
     assert_ne!(next_packet.packet_id, packet.packet_id);

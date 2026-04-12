@@ -2,22 +2,25 @@
   {
     "fragment_id": "f1",
     "kind": "doctrine",
-    "text": "Keep runtime deterministic."
+    "summary": "Keep runtime deterministic.",
+    "full_text": "Keep runtime deterministic. Prefer packet assembly, feedback scoring, and persistence flows that produce stable results from the same inputs so debugging and trust do not drift."
   },
   {
     "fragment_id": "f2",
     "kind": "pitfall",
-    "text": "Do not skip fragment feedback."
+    "summary": "Do not skip fragment feedback.",
+    "full_text": "Do not skip fragment feedback. Every fragment sent in a packet should receive an explicit verdict so retrieval quality changes are grounded in concrete evidence instead of vague session-level impressions."
   },
   {
     "fragment_id": "f3",
     "kind": "procedure",
-    "text": "Validate packet before commit."
+    "summary": "Validate packet before commit.",
+    "full_text": "Validate packet before commit. Check selected fragments, packet scope, and feedback coverage before persisting changes so Athena does not learn from malformed packets."
   },
   {
     "fragment_id": "f4",
     "kind": "context",
-    "text": "Tracer bullet uses fixed fixture fragments."
+    "summary": "Tracer bullet uses fixed fixture fragments.",
+    "full_text": "Tracer bullet uses fixed fixture fragments. Early end-to-end tests rely on deterministic fixture data so packet and feedback behavior can be verified before retrieval and ranking become more sophisticated."
   }
 ]
-

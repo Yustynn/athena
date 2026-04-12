@@ -66,13 +66,14 @@ purpose
 
 ## 2. Fragment
 
-Atomic memory unit used by packet assembler.
+Coherent memory unit used by packet assembler. Usually one operational idea, often one short paragraph.
 
 ```text
 fragment
   fragment_id
   type
-  text
+  summary
+  full_text
   scope
   trigger_conditions[]
   state
@@ -91,7 +92,8 @@ fragment
 
 - `fragment_id`: stable fragment identity
 - `type`: `doctrine | procedure | pitfall | preference | context`
-- `text`: atomic claim or rule
+- `summary`: short retrieval and packet-display form
+- `full_text`: canonical paragraph-sized memory body
 - `scope`: where fragment applies
 - `trigger_conditions[]`: when packet assembler should consider it
 - `state`: `scratch | durable | deferred | stale | superseded`

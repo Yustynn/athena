@@ -72,6 +72,8 @@ impl DoltStorage {
                 fragment_id VARCHAR(255) NOT NULL,
                 kind VARCHAR(32) NOT NULL,
                 text TEXT NOT NULL,
+                summary TEXT,
+                full_text TEXT,
                 position BIGINT NOT NULL,
                 PRIMARY KEY (packet_id, fragment_id)
             );
@@ -95,7 +97,9 @@ impl DoltStorage {
             CREATE TABLE IF NOT EXISTS fragment_nodes (
                 fragment_id VARCHAR(255) PRIMARY KEY,
                 kind VARCHAR(32) NOT NULL,
-                text TEXT NOT NULL
+                text TEXT NOT NULL,
+                summary TEXT,
+                full_text TEXT
             );
 
             CREATE TABLE IF NOT EXISTS fragment_edges (
@@ -106,6 +110,10 @@ impl DoltStorage {
             );
             ",
         )?;
+        self.ensure_column("packet_fragments", "summary", "TEXT")?;
+        self.ensure_column("packet_fragments", "full_text", "TEXT")?;
+        self.ensure_column("fragment_nodes", "summary", "TEXT")?;
+        self.ensure_column("fragment_nodes", "full_text", "TEXT")?;
         Ok(())
     }
 
@@ -175,12 +183,14 @@ impl DoltStorage {
 
         for (position, fragment) in packet.fragments.iter().enumerate() {
             self.exec(&format!(
-                "INSERT INTO packet_fragments (packet_id, fragment_id, kind, text, position)
-                 VALUES ({}, {}, {}, {}, {});",
+                "INSERT INTO packet_fragments (packet_id, fragment_id, kind, text, summary, full_text, position)
+                 VALUES ({}, {}, {}, {}, {}, {}, {});",
                 sql_str(&packet.packet_id.0),
                 sql_str(&fragment.fragment_id.0),
                 sql_str(fragment_kind_to_db(&fragment.kind)),
-                sql_str(&fragment.text),
+                sql_str(&fragment.full_text),
+                sql_str(&fragment.summary),
+                sql_str(&fragment.full_text),
                 position,
             ))?;
         }
@@ -199,7 +209,10 @@ impl DoltStorage {
 
         let purpose_id = PurposeId::new(json_str(packet_row, "purpose_id")?);
         let fragment_rows = self.query_json_rows(&format!(
-            "SELECT fragment_id, kind, text FROM packet_fragments WHERE packet_id = {} ORDER BY position ASC;",
+            "SELECT fragment_id, kind,
+                    IFNULL(summary, text) AS summary,
+                    IFNULL(full_text, text) AS full_text
+             FROM packet_fragments WHERE packet_id = {} ORDER BY position ASC;",
             sql_str(&packet_id.0)
         ))?;
 
@@ -209,7 +222,8 @@ impl DoltStorage {
                 Ok(Fragment {
                     fragment_id: FragmentId::new(json_str(&row, "fragment_id")?),
                     kind: fragment_kind_from_db(&json_str(&row, "kind")?)?,
-                    text: json_str(&row, "text")?,
+                    summary: json_str(&row, "summary")?,
+                    full_text: json_str(&row, "full_text")?,
                 })
             })
             .collect::<Result<Vec<_>, AthenaError>>()?;
@@ -325,13 +339,16 @@ impl DoltStorage {
         &self,
         fragment_id: &FragmentId,
         kind: &FragmentKind,
-        text: &str,
+        summary: &str,
+        full_text: &str,
     ) -> Result<(), AthenaError> {
         self.exec(&format!(
-            "INSERT INTO fragment_nodes (fragment_id, kind, text) VALUES ({}, {}, {});",
+            "INSERT INTO fragment_nodes (fragment_id, kind, text, summary, full_text) VALUES ({}, {}, {}, {}, {});",
             sql_str(&fragment_id.0),
             sql_str(fragment_kind_to_db(kind)),
-            sql_str(text),
+            sql_str(full_text),
+            sql_str(summary),
+            sql_str(full_text),
         ))
     }
 
@@ -340,7 +357,10 @@ impl DoltStorage {
         fragment_id: &FragmentId,
     ) -> Result<Option<Fragment>, AthenaError> {
         let rows = self.query_json_rows(&format!(
-            "SELECT fragment_id, kind, text FROM fragment_nodes WHERE fragment_id = {};",
+            "SELECT fragment_id, kind,
+                    IFNULL(summary, text) AS summary,
+                    IFNULL(full_text, text) AS full_text
+             FROM fragment_nodes WHERE fragment_id = {};",
             sql_str(&fragment_id.0)
         ))?;
 
@@ -351,13 +371,17 @@ impl DoltStorage {
         Ok(Some(Fragment {
             fragment_id: FragmentId::new(json_str(row, "fragment_id")?),
             kind: fragment_kind_from_db(&json_str(row, "kind")?)?,
-            text: json_str(row, "text")?,
+            summary: json_str(row, "summary")?,
+            full_text: json_str(row, "full_text")?,
         }))
     }
 
     pub fn list_fragment_nodes(&self) -> Result<Vec<Fragment>, AthenaError> {
         let rows = self.query_json_rows(
-            "SELECT fragment_id, kind, text FROM fragment_nodes ORDER BY fragment_id ASC;",
+            "SELECT fragment_id, kind,
+                    IFNULL(summary, text) AS summary,
+                    IFNULL(full_text, text) AS full_text
+             FROM fragment_nodes ORDER BY fragment_id ASC;",
         )?;
 
         rows.into_iter()
@@ -365,7 +389,8 @@ impl DoltStorage {
                 Ok(Fragment {
                     fragment_id: FragmentId::new(json_str(&row, "fragment_id")?),
                     kind: fragment_kind_from_db(&json_str(&row, "kind")?)?,
-                    text: json_str(&row, "text")?,
+                    summary: json_str(&row, "summary")?,
+                    full_text: json_str(&row, "full_text")?,
                 })
             })
             .collect::<Result<Vec<_>, AthenaError>>()
@@ -408,6 +433,22 @@ impl DoltStorage {
         Ok(!self
             .query_json_rows("SELECT table_name FROM dolt_status LIMIT 1;")?
             .is_empty())
+    }
+
+    fn ensure_column(
+        &self,
+        table: &str,
+        column: &str,
+        definition: &str,
+    ) -> Result<(), AthenaError> {
+        let probe = format!("SELECT {column} FROM {table} LIMIT 0;");
+        if self.query_json_rows(&probe).is_ok() {
+            return Ok(());
+        }
+
+        self.exec(&format!(
+            "ALTER TABLE {table} ADD COLUMN {column} {definition};"
+        ))
     }
 
     fn exec(&self, sql: &str) -> Result<(), AthenaError> {

@@ -21,12 +21,16 @@ fn sample_fragments() -> Vec<Fragment> {
         Fragment {
             fragment_id: FragmentId::new("f1"),
             kind: FragmentKind::Doctrine,
-            text: "Keep deterministic behavior".into(),
+            summary: "Keep deterministic behavior".into(),
+            full_text:
+                "Keep deterministic behavior. Prefer stable packet assembly and feedback handling."
+                    .into(),
         },
         Fragment {
             fragment_id: FragmentId::new("f2"),
             kind: FragmentKind::Pitfall,
-            text: "Do not skip per-fragment feedback\twith tabs\nor new lines".into(),
+            summary: "Do not skip per-fragment feedback".into(),
+            full_text: "Do not skip per-fragment feedback\twith tabs\nor new lines".into(),
         },
     ]
 }
@@ -105,6 +109,7 @@ fn dolt_fragment_node_is_immutable_and_edges_link_nodes() {
             &FragmentId::new("f_old"),
             &FragmentKind::Doctrine,
             "Old deterministic guidance",
+            "Old deterministic guidance. Earlier version of paragraph-sized memory.",
         )
         .unwrap();
 
@@ -113,6 +118,7 @@ fn dolt_fragment_node_is_immutable_and_edges_link_nodes() {
             &FragmentId::new("f_new"),
             &FragmentKind::Doctrine,
             "Updated deterministic guidance",
+            "Updated deterministic guidance. New paragraph replaces earlier wording.",
         )
         .unwrap();
 
@@ -129,6 +135,7 @@ fn dolt_fragment_node_is_immutable_and_edges_link_nodes() {
         &FragmentId::new("f_old"),
         &FragmentKind::Doctrine,
         "mutated text",
+        "mutated text that should not overwrite immutable fragment body",
     );
     assert!(in_place_update.is_err());
 

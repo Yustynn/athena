@@ -1,0 +1,590 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+db_path="$repo_root/.athena/db"
+fixture_path="$repo_root/.athena/fragments.json"
+dolt_home="$repo_root/.athena/.dolt-home"
+session_path="$repo_root/.athena/session.json"
+
+usage() {
+  cat <<'EOF'
+usage:
+  scripts/athena latest-state
+  scripts/athena current
+  scripts/athena use-latest
+  scripts/athena clear-session
+  scripts/athena ensure-purpose --statement "..." --success-criteria "..."
+  scripts/athena create --statement "..." --success-criteria "..."
+  scripts/athena update [--purpose-id purpose-...] --statement "..." --success-criteria "..."
+  scripts/athena feedback [--purpose-id purpose-...] [--packet-id packet-...] --outcome success|partial|failed [--input feedback.json]
+
+short forms:
+  scripts/athena ensure-purpose "statement" "success criteria"
+  scripts/athena create "statement" "success criteria"
+  scripts/athena update "statement" "success criteria"
+  scripts/athena feedback partial feedback.json
+EOF
+}
+
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "missing command: $1"
+}
+
+ensure_storage() {
+  require_command dolt
+  mkdir -p "$db_path" "$dolt_home"
+
+  if [[ ! -d "$db_path/.dolt" ]]; then
+    (
+      cd "$db_path"
+      HOME="$dolt_home" dolt init --name Athena --email athena@local >/dev/null
+    )
+  fi
+
+  (
+    cd "$db_path"
+    HOME="$dolt_home" dolt sql -q "
+      CREATE TABLE IF NOT EXISTS purposes (
+        purpose_id VARCHAR(255) PRIMARY KEY,
+        statement TEXT NOT NULL,
+        success_criteria TEXT NOT NULL,
+        status VARCHAR(32) NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS packets (
+        packet_id VARCHAR(255) PRIMARY KEY,
+        purpose_id VARCHAR(255) NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS packet_fragments (
+        packet_id VARCHAR(255) NOT NULL,
+        fragment_id VARCHAR(255) NOT NULL,
+        kind VARCHAR(32) NOT NULL,
+        text TEXT NOT NULL,
+        summary TEXT,
+        full_text TEXT,
+        position BIGINT NOT NULL,
+        PRIMARY KEY (packet_id, fragment_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS feedback_events (
+        feedback_id VARCHAR(255) PRIMARY KEY,
+        purpose_id VARCHAR(255) NOT NULL,
+        packet_id VARCHAR(255) NOT NULL,
+        outcome VARCHAR(32) NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS feedback_fragments (
+        feedback_id VARCHAR(255) NOT NULL,
+        fragment_id VARCHAR(255) NOT NULL,
+        verdict VARCHAR(32) NOT NULL,
+        reason TEXT,
+        position BIGINT NOT NULL,
+        PRIMARY KEY (feedback_id, fragment_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS fragment_nodes (
+        fragment_id VARCHAR(255) PRIMARY KEY,
+        kind VARCHAR(32) NOT NULL,
+        text TEXT NOT NULL,
+        summary TEXT,
+        full_text TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS fragment_edges (
+        from_fragment_id VARCHAR(255) NOT NULL,
+        to_fragment_id VARCHAR(255) NOT NULL,
+        edge_type VARCHAR(255) NOT NULL,
+        PRIMARY KEY (from_fragment_id, to_fragment_id, edge_type)
+      );
+    " >/dev/null
+  )
+
+  ensure_text_column packet_fragments summary
+  ensure_text_column packet_fragments full_text
+  ensure_text_column fragment_nodes summary
+  ensure_text_column fragment_nodes full_text
+}
+
+ensure_text_column() {
+  local table="$1"
+  local column="$2"
+
+  if (
+    cd "$db_path"
+    HOME="$dolt_home" dolt sql -q "SELECT $column FROM $table LIMIT 0;" >/dev/null 2>&1
+  ); then
+    return
+  fi
+
+  (
+    cd "$db_path"
+    HOME="$dolt_home" dolt sql -q "ALTER TABLE $table ADD COLUMN $column TEXT;" >/dev/null
+  )
+}
+
+run_dolt_json() {
+  local sql="$1"
+  (
+    cd "$db_path"
+    HOME="$dolt_home" dolt sql -q "$sql" -r json
+  )
+}
+
+json_field() {
+  local raw_json="$1"
+  local path="$2"
+  RAW_JSON="$raw_json" JSON_PATH="$path" ruby -rjson <<'RUBY'
+data = JSON.parse(ENV.fetch("RAW_JSON"))
+path = ENV.fetch("JSON_PATH").split(".")
+value = path.reduce(data) do |current, segment|
+  break nil if current.nil?
+  if segment.end_with?("]")
+    name, index = segment.match(/\A([^\[]+)\[(\d+)\]\z/).captures
+    current.fetch(name, [])[index.to_i]
+  else
+    current[segment]
+  end
+end
+print(value.is_a?(String) ? value : "")
+RUBY
+}
+
+assemble_state_json() {
+  local purpose_rows="$1"
+  local packet_rows="$2"
+  local fragment_rows="$3"
+  PURPOSE_ROWS="$purpose_rows" PACKET_ROWS="$packet_rows" FRAGMENT_ROWS="$fragment_rows" ruby -rjson <<'RUBY'
+purpose = JSON.parse(ENV.fetch("PURPOSE_ROWS")).fetch("rows", []).first
+packet = JSON.parse(ENV.fetch("PACKET_ROWS")).fetch("rows", []).first
+fragments = JSON.parse(ENV.fetch("FRAGMENT_ROWS")).fetch("rows", []).map do |row|
+  {
+    "fragment_id" => row.fetch("fragment_id"),
+    "kind" => row.fetch("kind"),
+    "summary" => row.fetch("summary"),
+    "full_text" => row.fetch("full_text"),
+  }
+end
+
+result = { "purpose" => purpose, "packet" => nil }
+if packet
+  result["packet"] = {
+    "packet_id" => packet.fetch("packet_id"),
+    "purpose_id" => packet.fetch("purpose_id"),
+    "fragments" => fragments,
+  }
+end
+
+puts JSON.pretty_generate(result)
+RUBY
+}
+
+latest_state_json() {
+  ensure_storage
+
+  local purpose_rows purpose_id packet_rows fragment_rows
+  purpose_rows="$(run_dolt_json "SELECT purpose_id, statement, success_criteria, status FROM purposes ORDER BY purpose_id DESC LIMIT 1;")"
+  purpose_id="$(json_field "$purpose_rows" "rows[0].purpose_id")"
+
+  if [[ -z "$purpose_id" ]]; then
+    printf '{\n  "purpose": null,\n  "packet": null\n}\n'
+    return
+  fi
+
+  packet_rows="$(run_dolt_json "SELECT packet_id, purpose_id FROM packets WHERE purpose_id = '$purpose_id' ORDER BY packet_id DESC LIMIT 1;")"
+  local packet_id
+  packet_id="$(json_field "$packet_rows" "rows[0].packet_id")"
+
+  if [[ -n "$packet_id" ]]; then
+    fragment_rows="$(run_dolt_json "SELECT fragment_id, kind, IFNULL(summary, text) AS summary, IFNULL(full_text, text) AS full_text, position FROM packet_fragments WHERE packet_id = '$packet_id' ORDER BY position ASC;")"
+  else
+    fragment_rows='{"rows":[]}'
+  fi
+
+  assemble_state_json "$purpose_rows" "$packet_rows" "$fragment_rows"
+}
+
+state_json_for_ids() {
+  local purpose_id="$1"
+  local packet_id="${2:-}"
+
+  ensure_storage
+
+  local purpose_rows packet_rows fragment_rows
+  purpose_rows="$(run_dolt_json "SELECT purpose_id, statement, success_criteria, status FROM purposes WHERE purpose_id = '$purpose_id' LIMIT 1;")"
+  if [[ -z "$(json_field "$purpose_rows" "rows[0].purpose_id")" ]]; then
+    return 1
+  fi
+
+  if [[ -n "$packet_id" ]]; then
+    packet_rows="$(run_dolt_json "SELECT packet_id, purpose_id FROM packets WHERE packet_id = '$packet_id' LIMIT 1;")"
+    if [[ -z "$(json_field "$packet_rows" "rows[0].packet_id")" ]]; then
+      packet_rows='{"rows":[]}'
+    fi
+  else
+    packet_rows="$(run_dolt_json "SELECT packet_id, purpose_id FROM packets WHERE purpose_id = '$purpose_id' ORDER BY packet_id DESC LIMIT 1;")"
+  fi
+
+  local resolved_packet_id
+  resolved_packet_id="$(json_field "$packet_rows" "rows[0].packet_id")"
+  if [[ -n "$resolved_packet_id" ]]; then
+    fragment_rows="$(run_dolt_json "SELECT fragment_id, kind, IFNULL(summary, text) AS summary, IFNULL(full_text, text) AS full_text, position FROM packet_fragments WHERE packet_id = '$resolved_packet_id' ORDER BY position ASC;")"
+  else
+    fragment_rows='{"rows":[]}'
+  fi
+
+  assemble_state_json "$purpose_rows" "$packet_rows" "$fragment_rows"
+}
+
+write_session_from_json() {
+  local raw_json="$1"
+  mkdir -p "$(dirname "$session_path")"
+  RAW_JSON="$raw_json" SESSION_PATH="$session_path" ruby -rjson <<'RUBY'
+data = JSON.parse(ENV.fetch("RAW_JSON"))
+purpose = data["purpose"]
+packet = data["packet"] || data["next_packet"]
+
+purpose_id = purpose&.fetch("purpose_id", nil) || data.dig("feedback", "purpose_id") || packet&.fetch("purpose_id", nil)
+packet_id = packet&.fetch("packet_id", nil) || data.dig("feedback", "packet_id")
+
+exit 0 unless purpose_id || packet_id
+
+session = {}
+session["purpose_id"] = purpose_id if purpose_id
+session["packet_id"] = packet_id if packet_id
+session["statement"] = purpose["statement"] if purpose&.key?("statement")
+session["success_criteria"] = purpose["success_criteria"] if purpose&.key?("success_criteria")
+
+File.write(ENV.fetch("SESSION_PATH"), JSON.pretty_generate(session) + "\n")
+RUBY
+}
+
+session_field() {
+  local field="$1"
+  if [[ ! -f "$session_path" ]]; then
+    return 0
+  fi
+
+  SESSION_PATH="$session_path" FIELD_NAME="$field" ruby -rjson <<'RUBY'
+path = ENV.fetch("SESSION_PATH")
+field = ENV.fetch("FIELD_NAME")
+data = JSON.parse(File.read(path))
+value = data[field]
+print(value.is_a?(String) ? value : "")
+RUBY
+}
+
+current_state_json() {
+  local purpose_id packet_id
+  purpose_id="$(session_field purpose_id)"
+  packet_id="$(session_field packet_id)"
+
+  if [[ -n "$purpose_id" ]] && state_json_for_ids "$purpose_id" "$packet_id"; then
+    return
+  fi
+
+  latest_state_json
+}
+
+resolve_purpose_id() {
+  local explicit_id="${1:-}"
+  if [[ -n "$explicit_id" ]]; then
+    printf '%s\n' "$explicit_id"
+    return
+  fi
+
+  local session_id
+  session_id="$(session_field purpose_id)"
+  if [[ -n "$session_id" ]]; then
+    printf '%s\n' "$session_id"
+    return
+  fi
+
+  local latest_state
+  latest_state="$(latest_state_json)"
+  json_field "$latest_state" "purpose.purpose_id"
+}
+
+resolve_packet_id() {
+  local explicit_id="${1:-}"
+  if [[ -n "$explicit_id" ]]; then
+    printf '%s\n' "$explicit_id"
+    return
+  fi
+
+  local session_id
+  session_id="$(session_field packet_id)"
+  if [[ -n "$session_id" ]]; then
+    printf '%s\n' "$session_id"
+    return
+  fi
+
+  local latest_state
+  latest_state="$(latest_state_json)"
+  json_field "$latest_state" "packet.packet_id"
+}
+
+run_persisted_cli() {
+  require_command cargo
+  cargo run --quiet --bin athena -- --db "$db_path" --fixture "$fixture_path" "$@"
+}
+
+read_lines_into_array() {
+  local target_name="$1"
+  shift
+
+  local line
+  local values=()
+  while IFS= read -r line; do
+    values+=("$line")
+  done < <("$@")
+
+  eval "$target_name=()"
+  local index
+  local quoted
+  for index in "${!values[@]}"; do
+    printf -v quoted '%q' "${values[$index]}"
+    eval "$target_name[$index]=$quoted"
+  done
+}
+
+parse_statement_success() {
+  local statement=""
+  local success_criteria=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --statement)
+        [[ $# -ge 2 ]] || die "--statement requires value"
+        statement="$2"
+        shift 2
+        ;;
+      --success-criteria)
+        [[ $# -ge 2 ]] || die "--success-criteria requires value"
+        success_criteria="$2"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        if [[ -z "$statement" ]]; then
+          statement="$1"
+        elif [[ -z "$success_criteria" ]]; then
+          success_criteria="$1"
+        else
+          die "unexpected argument: $1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  [[ -n "$statement" ]] || die "statement is required"
+  [[ -n "$success_criteria" ]] || die "success criteria is required"
+
+  printf '%s\n%s\n' "$statement" "$success_criteria"
+}
+
+parse_update_args() {
+  local purpose_id=""
+  local statement=""
+  local success_criteria=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --purpose-id)
+        [[ $# -ge 2 ]] || die "--purpose-id requires value"
+        purpose_id="$2"
+        shift 2
+        ;;
+      --statement)
+        [[ $# -ge 2 ]] || die "--statement requires value"
+        statement="$2"
+        shift 2
+        ;;
+      --success-criteria)
+        [[ $# -ge 2 ]] || die "--success-criteria requires value"
+        success_criteria="$2"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        if [[ -z "$statement" ]]; then
+          statement="$1"
+        elif [[ -z "$success_criteria" ]]; then
+          success_criteria="$1"
+        else
+          die "unexpected argument: $1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  [[ -n "$statement" ]] || die "statement is required"
+  [[ -n "$success_criteria" ]] || die "success criteria is required"
+
+  printf '%s\n%s\n%s\n' "$purpose_id" "$statement" "$success_criteria"
+}
+
+parse_feedback_args() {
+  local purpose_id=""
+  local packet_id=""
+  local outcome=""
+  local input_path="-"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --purpose-id)
+        [[ $# -ge 2 ]] || die "--purpose-id requires value"
+        purpose_id="$2"
+        shift 2
+        ;;
+      --packet-id)
+        [[ $# -ge 2 ]] || die "--packet-id requires value"
+        packet_id="$2"
+        shift 2
+        ;;
+      --outcome)
+        [[ $# -ge 2 ]] || die "--outcome requires value"
+        outcome="$2"
+        shift 2
+        ;;
+      --input)
+        [[ $# -ge 2 ]] || die "--input requires value"
+        input_path="$2"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        if [[ -z "$outcome" ]]; then
+          outcome="$1"
+        elif [[ "$input_path" == "-" ]]; then
+          input_path="$1"
+        else
+          die "unexpected argument: $1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  case "$outcome" in
+    success|partial|failed) ;;
+    *) die "outcome must be success, partial, or failed" ;;
+  esac
+
+  printf '%s\n%s\n%s\n%s\n' "$purpose_id" "$packet_id" "$outcome" "$input_path"
+}
+
+read_input_path() {
+  local input_path="${1:-"-"}"
+  if [[ "$input_path" == "-" ]]; then
+    cat
+  else
+    [[ -f "$input_path" ]] || die "missing input file: $input_path"
+    cat "$input_path"
+  fi
+}
+
+command_name="${1:-}"
+if [[ -z "$command_name" ]]; then
+  usage
+  exit 1
+fi
+shift
+
+case "$command_name" in
+  latest-state)
+    latest_state_json
+    ;;
+  current)
+    current_state_json
+    ;;
+  use-latest)
+    state="$(latest_state_json)"
+    if [[ "$(json_field "$state" "purpose.purpose_id")" == "" ]]; then
+      die "no persisted Athena purpose found"
+    fi
+    write_session_from_json "$state"
+    printf '%s\n' "$state"
+    ;;
+  clear-session)
+    rm -f "$session_path"
+    ;;
+  ensure-purpose)
+    read_lines_into_array parsed parse_statement_success "$@"
+    statement="${parsed[0]}"
+    success_criteria="${parsed[1]}"
+    state="$(latest_state_json)"
+    latest_purpose_id="$(json_field "$state" "purpose.purpose_id")"
+    latest_status="$(json_field "$state" "purpose.status")"
+    latest_statement="$(json_field "$state" "purpose.statement")"
+    latest_success="$(json_field "$state" "purpose.success_criteria")"
+
+    if [[ -z "$latest_purpose_id" || "$latest_status" != "active" ]]; then
+      output="$(run_persisted_cli purpose create --statement "$statement" --success-criteria "$success_criteria")"
+    elif [[ "$latest_statement" == "$statement" && "$latest_success" == "$success_criteria" ]]; then
+      output="$state"
+    else
+      output="$(run_persisted_cli purpose update --purpose-id "$latest_purpose_id" --statement "$statement" --success-criteria "$success_criteria")"
+    fi
+
+    write_session_from_json "$output"
+    printf '%s\n' "$output"
+    ;;
+  create)
+    read_lines_into_array parsed parse_statement_success "$@"
+    statement="${parsed[0]}"
+    success_criteria="${parsed[1]}"
+    output="$(run_persisted_cli purpose create --statement "$statement" --success-criteria "$success_criteria")"
+    write_session_from_json "$output"
+    printf '%s\n' "$output"
+    ;;
+  update)
+    read_lines_into_array parsed parse_update_args "$@"
+    explicit_purpose_id="${parsed[0]}"
+    statement="${parsed[1]}"
+    success_criteria="${parsed[2]}"
+    purpose_id="$(resolve_purpose_id "$explicit_purpose_id")"
+    [[ -n "$purpose_id" ]] || die "no purpose id found; create or sync Athena session first"
+    output="$(run_persisted_cli purpose update --purpose-id "$purpose_id" --statement "$statement" --success-criteria "$success_criteria")"
+    write_session_from_json "$output"
+    printf '%s\n' "$output"
+    ;;
+  feedback)
+    read_lines_into_array parsed parse_feedback_args "$@"
+    explicit_purpose_id="${parsed[0]}"
+    explicit_packet_id="${parsed[1]}"
+    outcome="${parsed[2]}"
+    input_path="${parsed[3]}"
+    purpose_id="$(resolve_purpose_id "$explicit_purpose_id")"
+    packet_id="$(resolve_packet_id "$explicit_packet_id")"
+    [[ -n "$purpose_id" ]] || die "no purpose id found; create or sync Athena session first"
+    [[ -n "$packet_id" ]] || die "no packet id found; create or sync Athena session first"
+    input_json="$(read_input_path "$input_path")"
+    output="$(printf '%s' "$input_json" | run_persisted_cli feedback apply --purpose-id "$purpose_id" --packet-id "$packet_id" --outcome "$outcome")"
+    write_session_from_json "$output"
+    printf '%s\n' "$output"
+    ;;
+  --help|-h|help)
+    usage
+    ;;
+  *)
+    die "unknown command: $command_name"
+    ;;
+esac

@@ -23,7 +23,8 @@ fn fragment_round_trips() {
     let value = Fragment {
         fragment_id: FragmentId::new("f1"),
         kind: FragmentKind::Doctrine,
-        text: "Keep runtime deterministic.".into(),
+        summary: "Keep runtime deterministic.".into(),
+        full_text: "Keep runtime deterministic. Favor stable outputs from identical inputs.".into(),
     };
 
     let json = serde_json::to_string(&value).unwrap();
@@ -39,7 +40,9 @@ fn packet_round_trips() {
         fragments: vec![Fragment {
             fragment_id: FragmentId::new("f1"),
             kind: FragmentKind::Doctrine,
-            text: "Keep runtime deterministic.".into(),
+            summary: "Keep runtime deterministic.".into(),
+            full_text: "Keep runtime deterministic. Favor stable outputs from identical inputs."
+                .into(),
         }],
     };
 
@@ -69,7 +72,15 @@ fn feedback_round_trips() {
 
 #[test]
 fn invalid_fragment_kind_fails() {
-    let json = r#"{"fragment_id":"f1","kind":"bad_kind","text":"nope"}"#;
+    let json = r#"{"fragment_id":"f1","kind":"bad_kind","summary":"nope","full_text":"nope"}"#;
     let parsed = serde_json::from_str::<Fragment>(json);
     assert!(parsed.is_err());
+}
+
+#[test]
+fn legacy_text_fragment_still_loads() {
+    let json = r#"{"fragment_id":"f1","kind":"doctrine","text":"legacy body"}"#;
+    let parsed = serde_json::from_str::<Fragment>(json).unwrap();
+    assert_eq!(parsed.summary, "legacy body");
+    assert_eq!(parsed.full_text, "legacy body");
 }

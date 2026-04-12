@@ -20,7 +20,12 @@ pub struct PurposeCommandResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NewFragmentInput {
     pub kind: FragmentKind,
-    pub text: String,
+    #[serde(default)]
+    pub summary: Option<String>,
+    #[serde(default)]
+    pub full_text: Option<String>,
+    #[serde(default)]
+    pub text: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,6 +41,21 @@ pub struct FeedbackApplyResult {
     pub created_fragments: Vec<Fragment>,
     pub fragment_scores: FragmentScores,
     pub next_packet: PurposePacket,
+}
+
+impl NewFragmentInput {
+    fn resolve_text(self) -> (String, String) {
+        let summary = self
+            .summary
+            .or_else(|| self.text.clone())
+            .or_else(|| self.full_text.clone())
+            .unwrap_or_default();
+        let full_text = self
+            .full_text
+            .or(self.text)
+            .unwrap_or_else(|| summary.clone());
+        (summary, full_text)
+    }
 }
 
 pub fn create_purpose(
@@ -109,12 +129,20 @@ pub fn apply_feedback_command(
         .new_fragments
         .into_iter()
         .map(|fragment| {
+            let kind = fragment.kind.clone();
+            let (summary, full_text) = fragment.resolve_text();
             let created = Fragment {
                 fragment_id: FragmentId::new(unique_id("fragment")),
-                kind: fragment.kind,
-                text: fragment.text,
+                kind,
+                summary,
+                full_text,
             };
-            storage.insert_fragment_node(&created.fragment_id, &created.kind, &created.text)?;
+            storage.insert_fragment_node(
+                &created.fragment_id,
+                &created.kind,
+                &created.summary,
+                &created.full_text,
+            )?;
             Ok(created)
         })
         .collect::<Result<Vec<_>, AthenaError>>()?;
