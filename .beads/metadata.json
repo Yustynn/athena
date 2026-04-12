@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "athena_v2",
+  "project_id": "0071ed43-e2f8-4890-ab78-6c07abd186ca"
+}
