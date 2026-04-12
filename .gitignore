@@ -7,6 +7,9 @@
 !.athena/db/.dolt/**
 .athena/db/.dolt/stats/
 .athena/.dolt-home/
+.athena/session.json
 *.db
 .beads-credential-key
 target/
+viewer/node_modules/
+viewer/dist/
