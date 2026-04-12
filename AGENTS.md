@@ -44,6 +44,16 @@ Default:
 - use stable `athena` MCP server for persisted repo work
 - use `athena-dev` only for experimental stateless packet/orientation calls
 
+Usage rules:
+- prefer stable `athena` MCP tools over CLI when Codex can call them directly
+- fall back to Athena CLI only if MCP is unavailable
+- at start of substantive work, call latest-state first; if no active purpose fits, create one
+- if scope or done condition changes materially, update purpose before continuing
+- after verification or learning, apply Athena feedback for packet used during work
+- only write `new_fragments` for durable reusable knowledge, not transient task chatter
+- if Athena output conflicts with repo reality or tests, trust repo reality first, then write corrective feedback
+- `athena-dev` is for experiments only. Do not write its outputs into canonical Athena memory unless tests pass or user explicitly approves promotion
+
 Repo now exposes minimal Athena stdio adapter for purpose -> packet -> feedback loop:
 
 ```bash
