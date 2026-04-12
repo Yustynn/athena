@@ -12,6 +12,14 @@ bd close <id>         # Complete work
 bd dolt push          # Push beads data to remote
 ```
 
+## Codex Cloud Setup
+
+Use this repo script in Codex cloud environment setup:
+
+```bash
+bash scripts/codex_cloud_setup.sh
+```
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
