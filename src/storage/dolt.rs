@@ -302,6 +302,42 @@ impl DoltStorage {
         ))
     }
 
+    pub fn get_fragment_node(
+        &self,
+        fragment_id: &FragmentId,
+    ) -> Result<Option<Fragment>, AthenaError> {
+        let rows = self.query_json_rows(&format!(
+            "SELECT fragment_id, kind, text FROM fragment_nodes WHERE fragment_id = {};",
+            sql_str(&fragment_id.0)
+        ))?;
+
+        let Some(row) = rows.first() else {
+            return Ok(None);
+        };
+
+        Ok(Some(Fragment {
+            fragment_id: FragmentId::new(json_str(row, "fragment_id")?),
+            kind: fragment_kind_from_db(&json_str(row, "kind")?)?,
+            text: json_str(row, "text")?,
+        }))
+    }
+
+    pub fn list_fragment_nodes(&self) -> Result<Vec<Fragment>, AthenaError> {
+        let rows = self.query_json_rows(
+            "SELECT fragment_id, kind, text FROM fragment_nodes ORDER BY fragment_id ASC;",
+        )?;
+
+        rows.into_iter()
+            .map(|row| {
+                Ok(Fragment {
+                    fragment_id: FragmentId::new(json_str(&row, "fragment_id")?),
+                    kind: fragment_kind_from_db(&json_str(&row, "kind")?)?,
+                    text: json_str(&row, "text")?,
+                })
+            })
+            .collect::<Result<Vec<_>, AthenaError>>()
+    }
+
     pub fn insert_fragment_edge(
         &self,
         from_fragment_id: &FragmentId,
@@ -362,15 +398,25 @@ impl DoltStorage {
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let rows = serde_json::from_str::<Value>(&stdout)
-            .ok()
-            .and_then(|value| value.get("rows").cloned())
-            .and_then(|rows| rows.as_array().cloned())
-            .ok_or_else(|| {
+        let value = serde_json::from_str::<Value>(&stdout).map_err(|err| {
+            AthenaError::Io(std::io::Error::other(format!(
+                "failed to parse dolt json output: {err}; raw={stdout}"
+            )))
+        })?;
+
+        let rows = match value.get("rows") {
+            Some(rows) => rows.as_array().cloned().ok_or_else(|| {
                 AthenaError::Io(std::io::Error::other(format!(
-                    "failed to parse dolt json output: raw={stdout}"
+                    "failed to parse dolt json rows: raw={stdout}"
                 )))
-            })?;
+            })?,
+            None if value.as_object().is_some_and(|object| object.is_empty()) => Vec::new(),
+            None => {
+                return Err(AthenaError::Io(std::io::Error::other(format!(
+                    "failed to parse dolt json output: raw={stdout}"
+                ))));
+            }
+        };
         Ok(rows)
     }
 

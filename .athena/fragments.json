@@ -1,0 +1,22 @@
+[
+  {
+    "fragment_id": "f1",
+    "kind": "doctrine",
+    "text": "Keep runtime deterministic."
+  },
+  {
+    "fragment_id": "f2",
+    "kind": "pitfall",
+    "text": "Do not skip fragment feedback."
+  },
+  {
+    "fragment_id": "f3",
+    "kind": "procedure",
+    "text": "Validate packet before commit."
+  },
+  {
+    "fragment_id": "f4",
+    "kind": "context",
+    "text": "Tracer bullet uses fixed fixture fragments."
+  }
+]

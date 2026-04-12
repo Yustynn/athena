@@ -22,6 +22,18 @@ bash scripts/codex_cloud_setup.sh
 
 ## Athena Session Loop
 
+Primary persisted Athena CLI:
+
+```bash
+cargo run --quiet --bin athena -- purpose create --statement "..." --success-criteria "..."
+cargo run --quiet --bin athena -- purpose update --purpose-id purpose-... --statement "..." --success-criteria "..."
+echo '{"fragment_feedback":[...],"new_fragments":[...]}' | cargo run --quiet --bin athena -- feedback apply --purpose-id purpose-... --packet-id packet-... --outcome partial
+```
+
+Tracked defaults:
+- purposes, packets, feedback persist in `.athena/db`
+- base fragments load from `.athena/fragments.json`
+
 Repo now exposes minimal Athena stdio adapter for purpose -> packet -> feedback loop:
 
 ```bash
