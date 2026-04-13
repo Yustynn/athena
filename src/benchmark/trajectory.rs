@@ -1,5 +1,6 @@
 use crate::error::AthenaError;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -63,6 +64,47 @@ pub enum TrajectoryParserKind {
     Unittest,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrajectoryDataSource {
+    CodexEventLog,
+    GitDiff,
+    RunnerStdout,
+    RunnerStderr,
+    VerifierStdout,
+    VerifierStderr,
+    DerivedFromMultiple,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrajectoryUsage {
+    pub input_tokens: Option<u64>,
+    pub cached_input_tokens: Option<u64>,
+    pub output_tokens: Option<u64>,
+    pub total_tokens: Option<u64>,
+    pub source: TrajectoryDataSource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrajectoryToolCount {
+    pub tool_name: String,
+    pub count: u64,
+    pub source: TrajectoryDataSource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrajectoryFileObservation {
+    pub path: String,
+    pub count: u64,
+    pub source: TrajectoryDataSource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrajectoryFailureDescription {
+    pub text: String,
+    pub source: TrajectoryDataSource,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TrajectoryBenchmarkReport {
     pub name: String,
@@ -79,12 +121,19 @@ pub struct TrajectoryStepResult {
     pub step_id: String,
     pub runner_exit_code: Option<i32>,
     pub runner_wall_time_ms: u128,
+    pub runner_event_log_path: Option<String>,
     pub verifier_exit_code: Option<i32>,
     pub verifier_wall_time_ms: u128,
     pub test_patch_applied: bool,
     pub fail_to_pass_rate: f64,
     pub pass_to_pass_rate: f64,
     pub resolved: bool,
+    pub usage: Option<TrajectoryUsage>,
+    pub tool_counts: Vec<TrajectoryToolCount>,
+    pub observed_read_files: Vec<TrajectoryFileObservation>,
+    pub observed_edit_files: Vec<TrajectoryFileObservation>,
+    pub changed_files: Vec<TrajectoryFileObservation>,
+    pub failure_description: Option<TrajectoryFailureDescription>,
     pub tests_status: BTreeMap<String, String>,
 }
 
@@ -141,8 +190,15 @@ pub fn run_trajectory_benchmark(
             )),
         )?;
         let runner_wall_time_ms = runner_started.elapsed().as_millis();
-        fs::write(step_root.join("runner.stdout.txt"), &runner_output.stdout)?;
-        fs::write(step_root.join("runner.stderr.txt"), &runner_output.stderr)?;
+        let runner_stdout_path = step_root.join("runner.stdout.txt");
+        let runner_stderr_path = step_root.join("runner.stderr.txt");
+        fs::write(&runner_stdout_path, &runner_output.stdout)?;
+        fs::write(&runner_stderr_path, &runner_output.stderr)?;
+        let runner_telemetry = parse_runner_telemetry(&runner_output.stdout, &repo_dir);
+        let changed_files = collect_changed_files(&repo_dir)?;
+        let diff_stat_path = step_root.join("git.diff.stat.txt");
+        let diff_stat = git_diff_stat(&repo_dir)?;
+        fs::write(&diff_stat_path, &diff_stat)?;
 
         let verifier_dir = run_root.join("verifier").join(&step.step_id);
         copy_dir_all(&repo_dir, &verifier_dir)?;
@@ -173,14 +229,10 @@ pub fn run_trajectory_benchmark(
             Some(verifier_env(&repo_dir)),
         )?;
         let verifier_wall_time_ms = verifier_started.elapsed().as_millis();
-        fs::write(
-            step_root.join("verifier.stdout.txt"),
-            &verifier_output.stdout,
-        )?;
-        fs::write(
-            step_root.join("verifier.stderr.txt"),
-            &verifier_output.stderr,
-        )?;
+        let verifier_stdout_path = step_root.join("verifier.stdout.txt");
+        let verifier_stderr_path = step_root.join("verifier.stderr.txt");
+        fs::write(&verifier_stdout_path, &verifier_output.stdout)?;
+        fs::write(&verifier_stderr_path, &verifier_output.stderr)?;
 
         let tests_status = parse_test_statuses(
             &format!("{}\n{}", verifier_output.stdout, verifier_output.stderr),
@@ -189,17 +241,41 @@ pub fn run_trajectory_benchmark(
         let fail_to_pass_rate = success_rate(&step.verifier.fail_to_pass, &tests_status);
         let pass_to_pass_rate = success_rate(&step.verifier.pass_to_pass, &tests_status);
         let resolved = fail_to_pass_rate == 1.0 && pass_to_pass_rate == 1.0;
+        let failure_description = if runner_output.exit_code != Some(0) {
+            summarize_failure(
+                &runner_output.stderr,
+                &runner_output.stdout,
+                TrajectoryDataSource::RunnerStderr,
+                TrajectoryDataSource::RunnerStdout,
+            )
+        } else if verifier_output.exit_code != Some(0) {
+            summarize_failure(
+                &verifier_output.stderr,
+                &verifier_output.stdout,
+                TrajectoryDataSource::VerifierStderr,
+                TrajectoryDataSource::VerifierStdout,
+            )
+        } else {
+            None
+        };
 
         step_results.push(TrajectoryStepResult {
             step_id: step.step_id.clone(),
             runner_exit_code: runner_output.exit_code,
             runner_wall_time_ms,
+            runner_event_log_path: keep_workdir.then(|| runner_stdout_path.to_string_lossy().into_owned()),
             verifier_exit_code: verifier_output.exit_code,
             verifier_wall_time_ms,
             test_patch_applied,
             fail_to_pass_rate,
             pass_to_pass_rate,
             resolved,
+            usage: runner_telemetry.usage,
+            tool_counts: runner_telemetry.tool_counts,
+            observed_read_files: runner_telemetry.observed_read_files,
+            observed_edit_files: runner_telemetry.observed_edit_files,
+            changed_files,
+            failure_description,
             tests_status,
         });
     }
@@ -404,6 +480,14 @@ struct CommandOutput {
     stderr: String,
 }
 
+#[derive(Debug, Default)]
+struct ParsedRunnerTelemetry {
+    usage: Option<TrajectoryUsage>,
+    tool_counts: Vec<TrajectoryToolCount>,
+    observed_read_files: Vec<TrajectoryFileObservation>,
+    observed_edit_files: Vec<TrajectoryFileObservation>,
+}
+
 fn resolve_command(base_dir: &Path, command: &[String]) -> Vec<String> {
     let Some((program, args)) = command.split_first() else {
         return Vec::new();
@@ -480,6 +564,230 @@ fn run_command_checked(
         output.stderr
     ))
     .into())
+}
+
+fn parse_runner_telemetry(output: &str, repo_dir: &Path) -> ParsedRunnerTelemetry {
+    let mut usage = None;
+    let mut tool_counts = BTreeMap::<String, u64>::new();
+    let mut observed_read_files = BTreeMap::<String, u64>::new();
+    let mut observed_edit_files = BTreeMap::<String, u64>::new();
+    let canonical_repo_dir = fs::canonicalize(repo_dir).unwrap_or_else(|_| repo_dir.to_path_buf());
+
+    for line in output.lines() {
+        let Ok(event) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+
+        match event.get("type").and_then(Value::as_str) {
+            Some("turn.completed") => {
+                if let Some(raw_usage) = event.get("usage") {
+                    let input_tokens = raw_usage.get("input_tokens").and_then(Value::as_u64);
+                    let cached_input_tokens =
+                        raw_usage.get("cached_input_tokens").and_then(Value::as_u64);
+                    let output_tokens = raw_usage.get("output_tokens").and_then(Value::as_u64);
+                    usage = Some(TrajectoryUsage {
+                        input_tokens,
+                        cached_input_tokens,
+                        output_tokens,
+                        total_tokens: combine_tokens(input_tokens, output_tokens),
+                        source: TrajectoryDataSource::CodexEventLog,
+                    });
+                }
+            }
+            Some("item.completed") => {
+                let Some(item) = event.get("item") else {
+                    continue;
+                };
+                let Some(item_type) = item.get("type").and_then(Value::as_str) else {
+                    continue;
+                };
+                if item_type == "agent_message" {
+                    continue;
+                }
+                *tool_counts.entry(item_type.to_string()).or_insert(0) += 1;
+
+                if item_type == "command_execution" {
+                    if let Some(command) = item.get("command").and_then(Value::as_str) {
+                        for path in observed_read_paths(command, &canonical_repo_dir) {
+                            *observed_read_files.entry(path).or_insert(0) += 1;
+                        }
+                    }
+                } else if item_type == "file_change" {
+                    if let Some(changes) = item.get("changes").and_then(Value::as_array) {
+                        for change in changes {
+                            let Some(path) = change.get("path").and_then(Value::as_str) else {
+                                continue;
+                            };
+                            if let Some(normalized) =
+                                normalize_repo_file(Path::new(path), &canonical_repo_dir)
+                            {
+                                *observed_edit_files.entry(normalized).or_insert(0) += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    ParsedRunnerTelemetry {
+        usage,
+        tool_counts: tool_counts
+            .into_iter()
+            .map(|(tool_name, count)| TrajectoryToolCount {
+                tool_name,
+                count,
+                source: TrajectoryDataSource::CodexEventLog,
+            })
+            .collect(),
+        observed_read_files: observed_read_files
+            .into_iter()
+            .map(|(path, count)| TrajectoryFileObservation {
+                path,
+                count,
+                source: TrajectoryDataSource::CodexEventLog,
+            })
+            .collect(),
+        observed_edit_files: observed_edit_files
+            .into_iter()
+            .map(|(path, count)| TrajectoryFileObservation {
+                path,
+                count,
+                source: TrajectoryDataSource::CodexEventLog,
+            })
+            .collect(),
+    }
+}
+
+fn combine_tokens(input_tokens: Option<u64>, output_tokens: Option<u64>) -> Option<u64> {
+    match (input_tokens, output_tokens) {
+        (Some(input_tokens), Some(output_tokens)) => Some(input_tokens + output_tokens),
+        _ => None,
+    }
+}
+
+fn observed_read_paths(command: &str, repo_dir: &Path) -> Vec<String> {
+    let mut paths = Vec::new();
+    for token in command.split(is_command_separator) {
+        let trimmed = token.trim_matches(|c: char| c == '"' || c == '\'' || c == '`');
+        if trimmed.is_empty() || trimmed.starts_with('-') {
+            continue;
+        }
+        let candidate = Path::new(trimmed);
+        let Some(normalized) = normalize_repo_file(candidate, repo_dir) else {
+            continue;
+        };
+        if !paths.contains(&normalized) {
+            paths.push(normalized);
+        }
+    }
+    paths
+}
+
+fn is_command_separator(ch: char) -> bool {
+    ch.is_whitespace()
+        || matches!(
+            ch,
+            '"' | '\'' | '`' | '(' | ')' | '[' | ']' | '{' | '}' | ';' | '|' | '&' | '<' | '>'
+                | '=' | ','
+        )
+}
+
+fn normalize_repo_file(path: &Path, repo_dir: &Path) -> Option<String> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        repo_dir.join(path)
+    };
+    if !absolute.is_file() {
+        return None;
+    }
+    let canonical = fs::canonicalize(&absolute).ok()?;
+    let relative = canonical.strip_prefix(repo_dir).ok()?;
+    Some(relative.to_string_lossy().into_owned())
+}
+
+fn collect_changed_files(repo_dir: &Path) -> Result<Vec<TrajectoryFileObservation>, AthenaError> {
+    let output = run_command(
+        &[
+            "git".into(),
+            "diff".into(),
+            "--name-only".into(),
+            "--relative".into(),
+        ],
+        repo_dir,
+        None,
+    )?;
+    let mut changed_files = Vec::new();
+    for path in output.stdout.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        changed_files.push(TrajectoryFileObservation {
+            path: path.to_string(),
+            count: 1,
+            source: TrajectoryDataSource::GitDiff,
+        });
+    }
+    Ok(changed_files)
+}
+
+fn git_diff_stat(repo_dir: &Path) -> Result<String, AthenaError> {
+    Ok(run_command(
+        &[
+            "git".into(),
+            "diff".into(),
+            "--stat".into(),
+            "--relative".into(),
+        ],
+        repo_dir,
+        None,
+    )?
+    .stdout)
+}
+
+fn summarize_failure(
+    primary_output: &str,
+    fallback_output: &str,
+    primary_source: TrajectoryDataSource,
+    fallback_source: TrajectoryDataSource,
+) -> Option<TrajectoryFailureDescription> {
+    summarize_failure_text(primary_output).map(|text| TrajectoryFailureDescription {
+        text,
+        source: primary_source,
+    })
+    .or_else(|| {
+        summarize_failure_text(fallback_output).map(|text| TrajectoryFailureDescription {
+            text,
+            source: fallback_source,
+        })
+    })
+}
+
+fn summarize_failure_text(output: &str) -> Option<String> {
+    for line in output.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        if line.contains("ERROR")
+            || line.contains("Error")
+            || line.contains("FAILED")
+            || line.contains("failed")
+            || line.contains("fatal")
+            || line.contains("Traceback")
+        {
+            return Some(truncate_text(line, 240));
+        }
+    }
+
+    output
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(|line| truncate_text(line, 240))
+}
+
+fn truncate_text(text: &str, max_chars: usize) -> String {
+    let mut truncated = String::new();
+    for ch in text.chars().take(max_chars) {
+        truncated.push(ch);
+    }
+    truncated
 }
 
 fn parse_test_statuses(output: &str, parser: &TrajectoryParserKind) -> BTreeMap<String, String> {

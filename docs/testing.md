@@ -105,6 +105,14 @@ Files:
 - real-run wrapper: `scripts/run_jinja_trajectory_tracer_bullet.sh`
 - tests: `tests/trajectory_benchmark.rs`
 
+Per-step telemetry:
+- `usage`: token counts from Codex JSON events when available
+- `tool_counts`: completed Codex event item types with counts
+- `observed_read_files`: best-effort repo files mentioned in command execution events
+- `observed_edit_files`: repo files from Codex `file_change` events
+- `changed_files`: repo files from post-step `git diff --name-only`
+- each telemetry item carries source enum so downstream analysis can distinguish event-log facts from git-diff facts
+
 Scorer output includes:
 - per-case `score`
 - decision correctness

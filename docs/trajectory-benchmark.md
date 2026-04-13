@@ -54,6 +54,9 @@ Outputs:
 - fail-to-pass rate
 - pass-to-pass rate
 - runner and verifier wall time
+- usage tokens from Codex JSON events when available
+- observed tool counts, read files, edit files, and git-changed files with source enums
+- failure description from runner or verifier output when step exits nonzero
 - aggregate resolved count and resolution rate
 
 ## Tracer Bullet
@@ -95,6 +98,13 @@ Runner contract:
 - benchmark runner sets env vars with repo path, prompt path, message file, and Athena mode
 - external runner command mutates repo in place
 - Codex helper script lives at `scripts/athena-trajectory-codex-step`
+- helper runs `codex exec --json` so runner stdout is raw JSONL event log
+
+Telemetry sources:
+- `codex_event_log`: parsed from Codex JSONL events on runner stdout
+- `git_diff`: parsed from post-step `git diff --name-only`
+- `runner_stdout` / `runner_stderr`: fallback source for runner failures
+- `verifier_stdout` / `verifier_stderr`: fallback source for verifier failures
 
 Important env vars:
 - `ATHENA_TRAJECTORY_REPO_DIR`

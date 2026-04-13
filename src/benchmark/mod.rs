@@ -16,6 +16,8 @@ pub use retrieval::{
 };
 pub use trajectory::{
     TrajectoryBenchmarkAggregate, TrajectoryBenchmarkReport, TrajectoryBenchmarkSpec,
-    TrajectoryBenchmarkStep, TrajectoryParserKind, TrajectoryRepoSource, TrajectoryRepoSpec,
-    TrajectoryRunnerSpec, TrajectoryStepResult, TrajectoryVerifierSpec, run_trajectory_benchmark,
+    TrajectoryBenchmarkStep, TrajectoryDataSource, TrajectoryFailureDescription,
+    TrajectoryFileObservation, TrajectoryParserKind, TrajectoryRepoSource, TrajectoryRepoSpec,
+    TrajectoryRunnerSpec, TrajectoryStepResult, TrajectoryToolCount, TrajectoryUsage,
+    TrajectoryVerifierSpec, run_trajectory_benchmark,
 };
