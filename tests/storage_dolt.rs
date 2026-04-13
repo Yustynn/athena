@@ -18,20 +18,18 @@ fn sample_purpose() -> Purpose {
 
 fn sample_fragments() -> Vec<Fragment> {
     vec![
-        Fragment {
-            fragment_id: FragmentId::new("f1"),
-            kind: FragmentKind::Doctrine,
-            summary: "Keep deterministic behavior".into(),
-            full_text:
-                "Keep deterministic behavior. Prefer stable packet assembly and feedback handling."
-                    .into(),
-        },
-        Fragment {
-            fragment_id: FragmentId::new("f2"),
-            kind: FragmentKind::Pitfall,
-            summary: "Do not skip per-fragment feedback".into(),
-            full_text: "Do not skip per-fragment feedback\twith tabs\nor new lines".into(),
-        },
+        Fragment::basic(
+            "f1",
+            FragmentKind::Doctrine,
+            "Keep deterministic behavior",
+            "Keep deterministic behavior. Prefer stable packet assembly and feedback handling.",
+        ),
+        Fragment::basic(
+            "f2",
+            FragmentKind::Pitfall,
+            "Do not skip per-fragment feedback",
+            "Do not skip per-fragment feedback\twith tabs\nor new lines",
+        ),
     ]
 }
 

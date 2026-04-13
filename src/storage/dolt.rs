@@ -219,12 +219,12 @@ impl DoltStorage {
         let fragments = fragment_rows
             .into_iter()
             .map(|row| {
-                Ok(Fragment {
-                    fragment_id: FragmentId::new(json_str(&row, "fragment_id")?),
-                    kind: fragment_kind_from_db(&json_str(&row, "kind")?)?,
-                    summary: json_str(&row, "summary")?,
-                    full_text: json_str(&row, "full_text")?,
-                })
+                Ok(Fragment::basic(
+                    json_str(&row, "fragment_id")?,
+                    fragment_kind_from_db(&json_str(&row, "kind")?)?,
+                    json_str(&row, "summary")?,
+                    json_str(&row, "full_text")?,
+                ))
             })
             .collect::<Result<Vec<_>, AthenaError>>()?;
 
@@ -368,12 +368,12 @@ impl DoltStorage {
             return Ok(None);
         };
 
-        Ok(Some(Fragment {
-            fragment_id: FragmentId::new(json_str(row, "fragment_id")?),
-            kind: fragment_kind_from_db(&json_str(row, "kind")?)?,
-            summary: json_str(row, "summary")?,
-            full_text: json_str(row, "full_text")?,
-        }))
+        Ok(Some(Fragment::basic(
+            json_str(row, "fragment_id")?,
+            fragment_kind_from_db(&json_str(row, "kind")?)?,
+            json_str(row, "summary")?,
+            json_str(row, "full_text")?,
+        )))
     }
 
     pub fn list_fragment_nodes(&self) -> Result<Vec<Fragment>, AthenaError> {
@@ -386,12 +386,12 @@ impl DoltStorage {
 
         rows.into_iter()
             .map(|row| {
-                Ok(Fragment {
-                    fragment_id: FragmentId::new(json_str(&row, "fragment_id")?),
-                    kind: fragment_kind_from_db(&json_str(&row, "kind")?)?,
-                    summary: json_str(&row, "summary")?,
-                    full_text: json_str(&row, "full_text")?,
-                })
+                Ok(Fragment::basic(
+                    json_str(&row, "fragment_id")?,
+                    fragment_kind_from_db(&json_str(&row, "kind")?)?,
+                    json_str(&row, "summary")?,
+                    json_str(&row, "full_text")?,
+                ))
             })
             .collect::<Result<Vec<_>, AthenaError>>()
     }
@@ -539,6 +539,7 @@ fn fragment_kind_to_db(kind: &FragmentKind) -> &'static str {
         FragmentKind::Doctrine => "doctrine",
         FragmentKind::Procedure => "procedure",
         FragmentKind::Pitfall => "pitfall",
+        FragmentKind::Preference => "preference",
         FragmentKind::Context => "context",
     }
 }
@@ -548,6 +549,7 @@ fn fragment_kind_from_db(value: &str) -> Result<FragmentKind, AthenaError> {
         "doctrine" => Ok(FragmentKind::Doctrine),
         "procedure" => Ok(FragmentKind::Procedure),
         "pitfall" => Ok(FragmentKind::Pitfall),
+        "preference" => Ok(FragmentKind::Preference),
         "context" => Ok(FragmentKind::Context),
         other => Err(AthenaError::Io(std::io::Error::other(format!(
             "invalid fragment kind: {other}"

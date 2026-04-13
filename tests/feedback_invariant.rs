@@ -11,21 +11,18 @@ fn packet() -> PurposePacket {
         packet_id: PacketId::new("packet-1"),
         purpose_id: PurposeId::new("purpose-1"),
         fragments: vec![
-            Fragment {
-                fragment_id: FragmentId::new("f1"),
-                kind: FragmentKind::Doctrine,
-                summary: "Keep runtime deterministic.".into(),
-                full_text:
-                    "Keep runtime deterministic. Favor stable outputs from identical inputs.".into(),
-            },
-            Fragment {
-                fragment_id: FragmentId::new("f2"),
-                kind: FragmentKind::Pitfall,
-                summary: "Do not skip fragment feedback.".into(),
-                full_text:
-                    "Do not skip fragment feedback. Record verdict for every fragment in packet."
-                        .into(),
-            },
+            Fragment::basic(
+                "f1",
+                FragmentKind::Doctrine,
+                "Keep runtime deterministic.",
+                "Keep runtime deterministic. Favor stable outputs from identical inputs.",
+            ),
+            Fragment::basic(
+                "f2",
+                FragmentKind::Pitfall,
+                "Do not skip fragment feedback.",
+                "Do not skip fragment feedback. Record verdict for every fragment in packet.",
+            ),
         ],
     }
 }

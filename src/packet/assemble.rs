@@ -1,9 +1,9 @@
 use crate::error::AthenaError;
-use crate::fragment::{Fragment, FragmentKind};
+use crate::fragment::{Fragment, FragmentState};
 use crate::ids::PacketId;
 use crate::packet::PurposePacket;
 use crate::purpose::Purpose;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub fn assemble_packet(
     purpose: &Purpose,
@@ -17,54 +17,34 @@ pub fn assemble_packet_with_scores(
     fragments: &[Fragment],
     fragment_scores: &BTreeMap<String, i32>,
 ) -> Result<PurposePacket, AthenaError> {
-    let mut selected = Vec::new();
     let input = format!("{} {}", purpose.statement, purpose.success_criteria).to_lowercase();
+    let superseded_ids = active_superseded_ids(fragments);
 
-    if let Some(fragment) = fragments.iter().find(|fragment| {
-        fragment.kind == FragmentKind::Doctrine && score_for(fragment, fragment_scores) > -2
-    }) {
-        selected.push(fragment.clone());
-    }
+    let mut ranked = fragments
+        .iter()
+        .filter(|fragment| should_consider(fragment, &input, &superseded_ids))
+        .map(|fragment| {
+            (
+                -rank_score(fragment, &input, fragment_scores),
+                fragment.fragment_id.clone(),
+                fragment,
+            )
+        })
+        .collect::<Vec<_>>();
+    ranked.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
 
-    if input.contains("feedback") {
-        if let Some(fragment) = fragments
-            .iter()
-            .find(|fragment| {
-                fragment.kind == FragmentKind::Pitfall && score_for(fragment, fragment_scores) > -2
-            })
-            .filter(|fragment| {
-                !selected
-                    .iter()
-                    .any(|existing| existing.fragment_id == fragment.fragment_id)
-            })
-        {
-            selected.push(fragment.clone());
-        }
-    }
+    let mut selected = Vec::new();
+    let mut concept_keys = BTreeSet::new();
 
-    let mut ranked_indices: Vec<usize> = (0..fragments.len()).collect();
-    ranked_indices.sort_by_key(|index| {
-        (
-            -score_for(&fragments[*index], fragment_scores),
-            *index as i32,
-        )
-    });
-
-    for index in ranked_indices {
-        let fragment = &fragments[index];
+    for (_, _, fragment) in ranked {
         if selected.len() >= 3 {
             break;
         }
 
-        if score_for(fragment, fragment_scores) <= -2 {
-            continue;
-        }
-
-        if selected
-            .iter()
-            .any(|existing| existing.fragment_id == fragment.fragment_id)
-        {
-            continue;
+        if let Some(key) = fragment.concept_key.as_ref() {
+            if !concept_keys.insert(key.to_lowercase()) {
+                continue;
+            }
         }
 
         selected.push(fragment.clone());
@@ -83,4 +63,60 @@ pub fn assemble_packet_with_scores(
 
 fn score_for(fragment: &Fragment, fragment_scores: &BTreeMap<String, i32>) -> i32 {
     *fragment_scores.get(&fragment.fragment_id.0).unwrap_or(&0)
+}
+
+fn should_consider(
+    fragment: &Fragment,
+    input: &str,
+    superseded_ids: &BTreeSet<String>,
+) -> bool {
+    if matches!(fragment.state, FragmentState::Stale | FragmentState::Superseded) {
+        return false;
+    }
+
+    if superseded_ids.contains(&fragment.fragment_id.0) {
+        return false;
+    }
+
+    if fragment
+        .scope
+        .as_ref()
+        .is_some_and(|scope| !input.contains(&scope.to_lowercase()))
+    {
+        return false;
+    }
+
+    fragment.trigger_conditions.is_empty()
+        || fragment
+            .trigger_conditions
+            .iter()
+            .any(|trigger| input.contains(&trigger.to_lowercase()))
+}
+
+fn active_superseded_ids(fragments: &[Fragment]) -> BTreeSet<String> {
+    fragments
+        .iter()
+        .filter(|fragment| !matches!(fragment.state, FragmentState::Stale | FragmentState::Superseded))
+        .flat_map(|fragment| fragment.supersedes.iter().map(|fragment_id| fragment_id.0.clone()))
+        .collect()
+}
+
+fn rank_score(fragment: &Fragment, input: &str, fragment_scores: &BTreeMap<String, i32>) -> i32 {
+    let trigger_bonus = if fragment.trigger_conditions.is_empty() {
+        0
+    } else if fragment
+        .trigger_conditions
+        .iter()
+        .any(|trigger| input.contains(&trigger.to_lowercase()))
+    {
+        2
+    } else {
+        0
+    };
+
+    score_for(fragment, fragment_scores)
+        + fragment.usefulness_score
+        + fragment.correctness_confidence
+        + fragment.durability_score
+        + trigger_bonus
 }

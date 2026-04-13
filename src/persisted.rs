@@ -3,7 +3,7 @@ use crate::feedback::{
     FeedbackEvent, FragmentFeedback, FragmentScores, TaskOutcome, apply_feedback, validate_feedback,
 };
 use crate::fragment::{Fragment, FragmentKind, load_fragments};
-use crate::ids::{FeedbackId, FragmentId, PacketId, PurposeId};
+use crate::ids::{FeedbackId, PacketId, PurposeId};
 use crate::packet::{PurposePacket, assemble_packet_with_scores};
 use crate::purpose::{Purpose, PurposeStatus};
 use crate::storage::DoltStorage;
@@ -131,12 +131,7 @@ pub fn apply_feedback_command(
         .map(|fragment| {
             let kind = fragment.kind.clone();
             let (summary, full_text) = fragment.resolve_text();
-            let created = Fragment {
-                fragment_id: FragmentId::new(unique_id("fragment")),
-                kind,
-                summary,
-                full_text,
-            };
+            let created = Fragment::basic(unique_id("fragment"), kind, summary, full_text);
             storage.insert_fragment_node(
                 &created.fragment_id,
                 &created.kind,
