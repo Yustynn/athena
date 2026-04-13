@@ -20,13 +20,18 @@ Do not use Athena wrappers, Athena MCP, or Athena memory for this run."
       --output-last-message "$message_file" \
       "$prompt"
     ;;
-  current)
+  current|preseed)
     prompt="$prompt
 
 Use Athena workflow from $repo_root during this run.
 At start of substantive work, set purpose with:
 $repo_root/scripts/athena ensure-purpose \"Solve trajectory benchmark step\" \"Implement requested repo change and verify hidden oracle-facing behavior.\"
 Use Athena normally after that when it helps orientation or follow-up work."
+    if [[ "$athena_mode" == "preseed" ]]; then
+      prompt="$prompt
+
+Blind benchmark fragments are already seeded in benchmark-local Athena storage."
+    fi
     codex exec --full-auto --color never --json --cd "$repo_dir" \
       --add-dir "$repo_root" \
       --output-last-message "$message_file" \

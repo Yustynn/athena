@@ -9,6 +9,7 @@ usage() {
 usage:
   scripts/run_jinja_trajectory_tracer_bullet.sh off
   scripts/run_jinja_trajectory_tracer_bullet.sh current
+  scripts/run_jinja_trajectory_tracer_bullet.sh preseed
   scripts/run_jinja_trajectory_tracer_bullet.sh both
 
 notes:
@@ -16,13 +17,14 @@ notes:
   keeps benchmark workdir for inspection
   requires network for clone and package install
   current mode runs codex with Athena workflow prompt
+  preseed mode adds blind benchmark-local Athena fragments before step 1
 EOF
 }
 
 mode="${1:-both}"
 
 case "$mode" in
-  off|current)
+  off|current|preseed)
     "$repo_root/scripts/athena-bench" trajectory \
       --keep-dev-db \
       --spec "$spec_path" \

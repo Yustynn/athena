@@ -94,6 +94,7 @@ Entrypoint:
 ```bash
 scripts/athena-bench trajectory --athena-mode off --keep-workdir
 scripts/athena-bench trajectory --athena-mode current --keep-workdir
+scripts/athena-bench trajectory --athena-mode preseed --keep-workdir
 ```
 
 Current semantic baseline:
@@ -116,6 +117,12 @@ Current-mode Athena wiring:
 - benchmark writes repo-local `.codex/hooks.json` plus session-start hook into cloned run repo before runner starts
 - hook injects `scripts/athena prime` output from athena-v2 host repo
 - codex step helper still appends explicit Athena `ensure-purpose` guidance to prompt
+
+Preseed-mode Athena wiring:
+- benchmark keeps `current` hook/prompt behavior
+- benchmark seeds blind fragments into benchmark-local Dolt storage under run root before step 1
+- fragment source comes from clone-repo orientation notes declared in benchmark spec, not prompts, hidden diffs, run logs, or athena-v2 docs
+- runner gets benchmark-local `ATHENA_DB_PATH` and `ATHENA_DOLT_HOME` so `scripts/athena` resolves seeded storage
 
 Per-step telemetry:
 - `usage`: token counts from Codex JSON events when available

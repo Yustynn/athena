@@ -94,6 +94,7 @@ Why this slice:
 benchmarks/trajectory/
   jinja_tracer_bullet.json
   jinja/
+    blind_fragments.json
     step1.prompt.md
     step2.prompt.md
     step3.prompt.md
@@ -106,10 +107,12 @@ Runner contract:
 - benchmark runner sets env vars with repo path, prompt path, message file, and Athena mode
 - in `current` mode, benchmark runner writes repo-local `.codex/hooks.json` and session-start hook into cloned repo before runner starts
 - generated hook emits `scripts/athena prime` output from athena-v2 host repo as SessionStart additional context
+- in `preseed` mode, benchmark runner also seeds benchmark-local Athena Dolt storage before step 1 from blind fragment fixture declared in spec
+- preseed source metadata must point at clone-repo files, not prompts, hidden diffs, run logs, or athena-v2 docs
 - external runner command mutates repo in place
 - Codex helper script lives at `scripts/athena-trajectory-codex-step`
 - helper runs `codex exec --json` so runner stdout is raw JSONL event log
-- helper still appends explicit Athena `ensure-purpose` guidance in `current` mode
+- helper still appends explicit Athena `ensure-purpose` guidance in Athena-enabled modes
 
 Telemetry sources:
 - `codex_event_log`: parsed from Codex JSONL events on runner stdout
@@ -123,6 +126,8 @@ Important env vars:
 - `ATHENA_TRAJECTORY_STEP_PROMPT_FILE`
 - `ATHENA_TRAJECTORY_MESSAGE_FILE`
 - `ATHENA_TRAJECTORY_ATHENA_MODE`
+- `ATHENA_DB_PATH`
+- `ATHENA_DOLT_HOME` in `preseed` mode
 
 ## First Implementation Slice
 

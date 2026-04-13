@@ -5,6 +5,11 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_dir="${ATHENA_TRAJECTORY_REPO_DIR:?}"
 step_id="${ATHENA_TRAJECTORY_STEP_ID:?}"
 
+if [[ -n "${ATHENA_DB_PATH:-}" ]]; then
+  printf '{\n  "athena_db_path": "%s",\n  "athena_dolt_home": "%s"\n}\n' \
+    "$ATHENA_DB_PATH" "${ATHENA_DOLT_HOME:-}" > "$repo_dir/.trajectory_runner_athena_env.json"
+fi
+
 case "$step_id" in
   step1_zero_capacity)
     patch_path="$script_dir/patches/step1.diff"

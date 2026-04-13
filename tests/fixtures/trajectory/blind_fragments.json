@@ -1,0 +1,14 @@
+[
+  {
+    "fragment_id": "fixture_blind_001",
+    "kind": "context",
+    "summary": "Fixture behavior lives in cachelib.py with public checks in tests/test_public.py.",
+    "full_text": "Implementation for fixture cache lives in `cachelib.py`, and externally visible behavior is exercised in `tests/test_public.py`. When behavior is unclear, inspect implementation and public tests together."
+  },
+  {
+    "fragment_id": "fixture_blind_002",
+    "kind": "procedure",
+    "summary": "Use repo-local files as canon before inferring cache semantics.",
+    "full_text": "Start from repo-local implementation and visible tests before guessing cache semantics from benchmark harness files. Orientation should come from cloned repo contents rather than prompt text or hidden verifier material."
+  }
+]

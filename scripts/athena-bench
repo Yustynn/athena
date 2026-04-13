@@ -12,7 +12,7 @@ usage:
   scripts/athena-bench clear
   scripts/athena-bench retrieval [--spec path] [--keep-dev-db]
   scripts/athena-bench creation [--spec path] [--proposals path] [--keep-dev-db]
-  scripts/athena-bench trajectory [--spec path] [--athena-mode off|current] [--keep-workdir] [--keep-dev-db]
+  scripts/athena-bench trajectory [--spec path] [--athena-mode off|current|preseed] [--keep-workdir] [--keep-dev-db]
 
 defaults:
   creation proposals path: benchmarks/creation/proposals/baseline.json

@@ -35,6 +35,25 @@
     ],
     "env": {}
   },
+  "athena_preseed": {
+    "fragments_path": "jinja/blind_fragments.json",
+    "source": {
+      "kind": "benchmark_clone_repo",
+      "repo_paths": [
+        "README.md",
+        "docs/index.rst",
+        "docs/intro.rst",
+        "src/jinja2/environment.py",
+        "src/jinja2/__init__.py",
+        "src/jinja2/loaders.py",
+        "tests/test_loader.py",
+        "src/jinja2/sandbox.py",
+        "tests/test_security.py",
+        "src/jinja2/nativetypes.py",
+        "tests/test_nativetypes.py"
+      ]
+    }
+  },
   "steps": [
     {
       "step_id": "step1_zero_capacity",

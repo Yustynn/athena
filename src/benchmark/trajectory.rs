@@ -1,4 +1,6 @@
 use crate::error::AthenaError;
+use crate::fragment::{Fragment, load_fragments};
+use crate::storage::DoltStorage;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -16,7 +18,27 @@ pub struct TrajectoryBenchmarkSpec {
     pub sequence_id: String,
     pub repo: TrajectoryRepoSpec,
     pub runner: TrajectoryRunnerSpec,
+    #[serde(default)]
+    pub athena_preseed: Option<TrajectoryAthenaPreseedSpec>,
     pub steps: Vec<TrajectoryBenchmarkStep>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrajectoryAthenaPreseedSpec {
+    pub fragments_path: String,
+    pub source: TrajectoryBlindFragmentSource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrajectoryBlindFragmentSource {
+    pub kind: TrajectoryBlindFragmentSourceKind,
+    pub repo_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrajectoryBlindFragmentSourceKind {
+    BenchmarkCloneRepo,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -147,11 +169,44 @@ pub struct TrajectoryBenchmarkAggregate {
     pub total_wall_time_ms: u128,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TrajectoryAthenaMode {
+    Off,
+    Current,
+    Preseed,
+}
+
+impl TrajectoryAthenaMode {
+    fn parse(value: &str) -> Result<Self, AthenaError> {
+        match value {
+            "off" => Ok(Self::Off),
+            "current" => Ok(Self::Current),
+            "preseed" => Ok(Self::Preseed),
+            _ => {
+                Err(std::io::Error::other("--athena-mode must be off, current, or preseed").into())
+            }
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Current => "current",
+            Self::Preseed => "preseed",
+        }
+    }
+
+    fn uses_athena(self) -> bool {
+        !matches!(self, Self::Off)
+    }
+}
+
 pub fn run_trajectory_benchmark(
     spec_path: impl AsRef<Path>,
     athena_mode: &str,
     keep_workdir: bool,
 ) -> Result<TrajectoryBenchmarkReport, AthenaError> {
+    let athena_mode = TrajectoryAthenaMode::parse(athena_mode)?;
     let spec_path = fs::canonicalize(spec_path.as_ref())?;
     let spec: TrajectoryBenchmarkSpec = read_json(&spec_path)?;
     let base_dir = spec_path
@@ -165,12 +220,13 @@ pub fn run_trajectory_benchmark(
     if !repo_dir.join(".git").exists() {
         initialize_git_repo(&repo_dir)?;
     }
-    if athena_mode == "current" {
+    if athena_mode.uses_athena() {
         install_athena_session_start_hook(&repo_dir)?;
     }
     for command in &spec.repo.setup_commands {
         run_command_checked(command, &repo_dir, None)?;
     }
+    let athena_env = prepare_athena_mode(athena_mode, &spec, base_dir, &repo_dir, &run_root)?;
 
     let mut step_results = Vec::new();
     for step in &spec.steps {
@@ -186,6 +242,7 @@ pub fn run_trajectory_benchmark(
             Some(benchmark_env(
                 &spec.runner.env,
                 athena_mode,
+                &athena_env,
                 &repo_dir,
                 &step.step_id,
                 &prompt_path,
@@ -266,7 +323,8 @@ pub fn run_trajectory_benchmark(
             step_id: step.step_id.clone(),
             runner_exit_code: runner_output.exit_code,
             runner_wall_time_ms,
-            runner_event_log_path: keep_workdir.then(|| runner_stdout_path.to_string_lossy().into_owned()),
+            runner_event_log_path: keep_workdir
+                .then(|| runner_stdout_path.to_string_lossy().into_owned()),
             verifier_exit_code: verifier_output.exit_code,
             verifier_wall_time_ms,
             test_patch_applied,
@@ -298,7 +356,7 @@ pub fn run_trajectory_benchmark(
         name: spec.name,
         sequence_id: spec.sequence_id,
         repo_id: spec.repo.repo_id,
-        athena_mode: athena_mode.to_string(),
+        athena_mode: athena_mode.as_str().to_string(),
         kept_run_root: keep_workdir.then(|| run_root.to_string_lossy().into_owned()),
         overall: TrajectoryBenchmarkAggregate {
             step_count: step_results.len(),
@@ -451,6 +509,94 @@ printf '}}\\n'\n"
     Ok(())
 }
 
+fn prepare_athena_mode(
+    athena_mode: TrajectoryAthenaMode,
+    spec: &TrajectoryBenchmarkSpec,
+    base_dir: &Path,
+    repo_dir: &Path,
+    run_root: &Path,
+) -> Result<BTreeMap<String, String>, AthenaError> {
+    match athena_mode {
+        TrajectoryAthenaMode::Off | TrajectoryAthenaMode::Current => Ok(BTreeMap::new()),
+        TrajectoryAthenaMode::Preseed => {
+            let preseed = spec.athena_preseed.as_ref().ok_or_else(|| {
+                std::io::Error::other("preseed mode requires athena_preseed spec")
+            })?;
+            validate_preseed_source(preseed, repo_dir)?;
+
+            let seed_root = run_root.join("athena-preseed");
+            let db_path = seed_root.join("db");
+            let dolt_home = seed_root.join(".dolt-home-db");
+            seed_athena_fragments(preseed, base_dir, &db_path)?;
+
+            let mut env = BTreeMap::new();
+            env.insert(
+                "ATHENA_DB_PATH".into(),
+                db_path.to_string_lossy().into_owned(),
+            );
+            env.insert(
+                "ATHENA_DOLT_HOME".into(),
+                dolt_home.to_string_lossy().into_owned(),
+            );
+            Ok(env)
+        }
+    }
+}
+
+fn validate_preseed_source(
+    preseed: &TrajectoryAthenaPreseedSpec,
+    repo_dir: &Path,
+) -> Result<(), AthenaError> {
+    if preseed.source.kind != TrajectoryBlindFragmentSourceKind::BenchmarkCloneRepo {
+        return Err(std::io::Error::other("unsupported preseed source kind").into());
+    }
+    if preseed.source.repo_paths.is_empty() {
+        return Err(std::io::Error::other("preseed source repo_paths cannot be empty").into());
+    }
+
+    for repo_path in &preseed.source.repo_paths {
+        let relative = Path::new(repo_path);
+        if relative.is_absolute() || repo_path.contains("..") {
+            return Err(std::io::Error::other(format!(
+                "preseed source path must stay repo-relative: {repo_path}"
+            ))
+            .into());
+        }
+
+        let candidate = repo_dir.join(relative);
+        if !candidate.exists() {
+            return Err(std::io::Error::other(format!(
+                "preseed source path missing from benchmark repo: {repo_path}"
+            ))
+            .into());
+        }
+    }
+
+    Ok(())
+}
+
+fn seed_athena_fragments(
+    preseed: &TrajectoryAthenaPreseedSpec,
+    base_dir: &Path,
+    db_path: &Path,
+) -> Result<Vec<Fragment>, AthenaError> {
+    let fragments_path = base_dir.join(&preseed.fragments_path);
+    let fragments = load_fragments(&fragments_path)?;
+    let storage = DoltStorage::open(db_path)?;
+
+    for fragment in &fragments {
+        storage.insert_fragment_node(
+            &fragment.fragment_id,
+            &fragment.kind,
+            &fragment.summary,
+            &fragment.full_text,
+        )?;
+    }
+    storage.commit_all("Seed trajectory benchmark blind fragments")?;
+
+    Ok(fragments)
+}
+
 fn shell_single_quote(value: &str) -> Result<String, AthenaError> {
     if value.contains('\0') {
         return Err(std::io::Error::other("shell value cannot contain NUL").into());
@@ -460,13 +606,15 @@ fn shell_single_quote(value: &str) -> Result<String, AthenaError> {
 
 fn benchmark_env(
     extra_env: &BTreeMap<String, String>,
-    athena_mode: &str,
+    athena_mode: TrajectoryAthenaMode,
+    athena_env: &BTreeMap<String, String>,
     repo_dir: &Path,
     step_id: &str,
     prompt_path: &Path,
     message_file: &Path,
 ) -> BTreeMap<String, String> {
     let mut env = extra_env.clone();
+    env.extend(athena_env.clone());
     env.insert(
         "ATHENA_TRAJECTORY_REPO_DIR".into(),
         repo_dir.to_string_lossy().into_owned(),
@@ -482,7 +630,7 @@ fn benchmark_env(
     );
     env.insert(
         "ATHENA_TRAJECTORY_ATHENA_MODE".into(),
-        athena_mode.to_string(),
+        athena_mode.as_str().to_string(),
     );
     env
 }
@@ -722,8 +870,21 @@ fn is_command_separator(ch: char) -> bool {
     ch.is_whitespace()
         || matches!(
             ch,
-            '"' | '\'' | '`' | '(' | ')' | '[' | ']' | '{' | '}' | ';' | '|' | '&' | '<' | '>'
-                | '=' | ','
+            '"' | '\''
+                | '`'
+                | '('
+                | ')'
+                | '['
+                | ']'
+                | '{'
+                | '}'
+                | ';'
+                | '|'
+                | '&'
+                | '<'
+                | '>'
+                | '='
+                | ','
         )
 }
 
@@ -753,7 +914,12 @@ fn collect_changed_files(repo_dir: &Path) -> Result<Vec<TrajectoryFileObservatio
         None,
     )?;
     let mut changed_files = Vec::new();
-    for path in output.stdout.lines().map(str::trim).filter(|line| !line.is_empty()) {
+    for path in output
+        .stdout
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+    {
         changed_files.push(TrajectoryFileObservation {
             path: path.to_string(),
             count: 1,
@@ -783,20 +949,25 @@ fn summarize_failure(
     primary_source: TrajectoryDataSource,
     fallback_source: TrajectoryDataSource,
 ) -> Option<TrajectoryFailureDescription> {
-    summarize_failure_text(primary_output).map(|text| TrajectoryFailureDescription {
-        text,
-        source: primary_source,
-    })
-    .or_else(|| {
-        summarize_failure_text(fallback_output).map(|text| TrajectoryFailureDescription {
+    summarize_failure_text(primary_output)
+        .map(|text| TrajectoryFailureDescription {
             text,
-            source: fallback_source,
+            source: primary_source,
         })
-    })
+        .or_else(|| {
+            summarize_failure_text(fallback_output).map(|text| TrajectoryFailureDescription {
+                text,
+                source: fallback_source,
+            })
+        })
 }
 
 fn summarize_failure_text(output: &str) -> Option<String> {
-    for line in output.lines().map(str::trim).filter(|line| !line.is_empty()) {
+    for line in output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+    {
         if line.contains("ERROR")
             || line.contains("Error")
             || line.contains("FAILED")

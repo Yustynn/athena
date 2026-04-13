@@ -21,7 +21,7 @@ fn usage() -> &'static str {
     "usage:
   athena-bench retrieval [--spec path]
   athena-bench creation [--spec path] --proposals path
-  athena-bench trajectory [--spec path] [--athena-mode off|current] [--keep-workdir]"
+  athena-bench trajectory [--spec path] [--athena-mode off|current|preseed] [--keep-workdir]"
 }
 
 fn require_flag(args: &[String], index: &mut usize, flag: &str) -> Result<String, io::Error> {
@@ -110,8 +110,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 index += 1;
             }
-            if athena_mode != "off" && athena_mode != "current" {
-                return Err(io::Error::other("--athena-mode must be off or current").into());
+            if athena_mode != "off" && athena_mode != "current" && athena_mode != "preseed" {
+                return Err(
+                    io::Error::other("--athena-mode must be off, current, or preseed").into(),
+                );
             }
             let report = run_trajectory_benchmark(spec_path, &athena_mode, keep_workdir)?;
             serde_json::to_writer_pretty(io::stdout(), &report)?;

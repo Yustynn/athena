@@ -16,6 +16,16 @@
     ],
     "env": {}
   },
+  "athena_preseed": {
+    "fragments_path": "blind_fragments.json",
+    "source": {
+      "kind": "benchmark_clone_repo",
+      "repo_paths": [
+        "cachelib.py",
+        "tests/test_public.py"
+      ]
+    }
+  },
   "steps": [
     {
       "step_id": "step1_zero_capacity",

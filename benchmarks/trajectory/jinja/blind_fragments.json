@@ -1,0 +1,20 @@
+[
+  {
+    "fragment_id": "jinja_blind_001",
+    "kind": "context",
+    "summary": "Jinja orientation starts at README/docs intro and Environment hub.",
+    "full_text": "Start orientation with `README.md`, `docs/index.rst`, and `docs/intro.rst` for repo map. `src/jinja2/environment.py` acts as core hub, and subsystem behavior tends to branch from there. Prefer module-local implementation plus nearby tests over broad repo scans."
+  },
+  {
+    "fragment_id": "jinja_blind_002",
+    "kind": "context",
+    "summary": "Public API surface lives in src/jinja2/__init__.py.",
+    "full_text": "Top-level exports and public API surface live in `src/jinja2/__init__.py`. `jinja2.__version__` is deprecated, so API-surface or version questions should start there instead of relying on scattered references."
+  },
+  {
+    "fragment_id": "jinja_blind_003",
+    "kind": "procedure",
+    "summary": "Subsystem behavior canon lives in module plus matching tests.",
+    "full_text": "For behavior questions, pair implementation with matching tests: loaders in `src/jinja2/loaders.py` with `tests/test_loader.py`, sandbox in `src/jinja2/sandbox.py` with `tests/test_security.py`, and native rendering in `src/jinja2/nativetypes.py` with `tests/test_nativetypes.py`. Treat those pairs as canonical before inferring semantics elsewhere."
+  }
+]
