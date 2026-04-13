@@ -77,12 +77,96 @@ function groupPacketHistory(packetRows) {
   return Array.from(packets.values());
 }
 
+function enrichFeedbackEvents(feedbackEvents, packetHistory) {
+  return feedbackEvents.map((entry) => {
+    const packetMatch = packetHistory.find(
+      (packetEntry) => packetEntry.packet_id === entry.packet_id,
+    );
+    const packetFragmentCount = packetMatch?.fragments.length ?? 0;
+
+    return {
+      ...entry,
+      packet_fragment_count: packetFragmentCount,
+      coverage_complete:
+        packetFragmentCount > 0 &&
+        Number(entry.fragment_feedback_count) === packetFragmentCount,
+    };
+  });
+}
+
+function annotatePacketHistory(packetHistory, feedbackEvents, session) {
+  const feedbackByPacketId = new Map(
+    feedbackEvents.map((entry) => [entry.packet_id, entry]),
+  );
+
+  return packetHistory.map((packet, index) => {
+    const previousPacket = packetHistory[index + 1] ?? null;
+    const fragmentIds = new Set(
+      (packet.fragments ?? []).map((fragment) => fragment.fragment_id),
+    );
+    const previousFragmentIds = new Set(
+      (previousPacket?.fragments ?? []).map((fragment) => fragment.fragment_id),
+    );
+    let carryoverCount = 0;
+
+    for (const fragmentId of fragmentIds) {
+      if (previousFragmentIds.has(fragmentId)) {
+        carryoverCount += 1;
+      }
+    }
+
+    let droppedCount = 0;
+    for (const fragmentId of previousFragmentIds) {
+      if (!fragmentIds.has(fragmentId)) {
+        droppedCount += 1;
+      }
+    }
+
+    return {
+      ...packet,
+      feedback_event: feedbackByPacketId.get(packet.packet_id) ?? null,
+      fragment_count: packet.fragments.length,
+      new_count: Math.max(packet.fragments.length - carryoverCount, 0),
+      carryover_count: carryoverCount,
+      dropped_count: droppedCount,
+      is_session_packet: packet.packet_id === session.packet_id,
+    };
+  });
+}
+
 function runDoltRows(sql) {
   return JSON.parse(runDolt(sql)).rows;
 }
 
 function loadAthenaState() {
   const session = readSession();
+  const purposes = runDoltRows(
+    `SELECT purpose_id, statement, status, success_criteria
+     FROM purposes
+     ORDER BY purpose_id DESC;`,
+  );
+  const allPacketRows = runDoltRows(
+    `SELECT p.packet_id, p.purpose_id, pf.fragment_id, pf.kind, pf.position,
+            IFNULL(pf.summary, pf.text) AS summary,
+            IFNULL(pf.full_text, pf.text) AS full_text
+     FROM packets p
+     LEFT JOIN packet_fragments pf ON pf.packet_id = p.packet_id
+     ORDER BY p.purpose_id DESC, p.packet_id DESC, pf.position ASC;`,
+  );
+  const allPacketHistory = groupPacketHistory(allPacketRows);
+  const allFeedbackEvents = enrichFeedbackEvents(
+    JSON.parse(
+      runDolt(
+        `SELECT fe.feedback_id, fe.purpose_id, fe.packet_id, fe.outcome,
+                COUNT(ff.fragment_id) AS fragment_feedback_count
+         FROM feedback_events fe
+         LEFT JOIN feedback_fragments ff ON ff.feedback_id = fe.feedback_id
+         GROUP BY fe.feedback_id, fe.purpose_id, fe.packet_id, fe.outcome
+         ORDER BY fe.feedback_id DESC;`,
+      ),
+    ).rows,
+    allPacketHistory,
+  );
   const purposeId =
     session.purpose_id ||
     runDoltRows(
@@ -100,18 +184,9 @@ function loadAthenaState() {
     : null;
 
   const packetIdFromSession = session.packet_id || null;
-  const packetRows = purposeId
-    ? runDoltRows(
-        `SELECT p.packet_id, p.purpose_id, pf.fragment_id, pf.kind, pf.position,
-                IFNULL(pf.summary, pf.text) AS summary,
-                IFNULL(pf.full_text, pf.text) AS full_text
-         FROM packets p
-         LEFT JOIN packet_fragments pf ON pf.packet_id = p.packet_id
-         WHERE p.purpose_id = '${purposeId}'
-         ORDER BY p.packet_id DESC, pf.position ASC;`,
-      )
+  const packetHistory = purposeId
+    ? allPacketHistory.filter((entry) => entry.purpose_id === purposeId)
     : [];
-  const packetHistory = groupPacketHistory(packetRows);
   const packet =
     (packetIdFromSession
       ? packetHistory.find((entry) => entry.packet_id === packetIdFromSession)
@@ -130,31 +205,9 @@ function loadAthenaState() {
   let feedbackEvents = [];
 
   if (purposeId) {
-    feedbackEvents = JSON.parse(
-      runDolt(
-        `SELECT fe.feedback_id, fe.purpose_id, fe.packet_id, fe.outcome,
-                COUNT(ff.fragment_id) AS fragment_feedback_count
-         FROM feedback_events fe
-         LEFT JOIN feedback_fragments ff ON ff.feedback_id = fe.feedback_id
-         WHERE fe.purpose_id = '${purposeId}'
-         GROUP BY fe.feedback_id, fe.purpose_id, fe.packet_id, fe.outcome
-         ORDER BY fe.feedback_id DESC
-         LIMIT 12;`,
-      ),
-    ).rows.map((entry) => {
-      const packetMatch = packetHistory.find(
-        (packetEntry) => packetEntry.packet_id === entry.packet_id,
-      );
-      const packetFragmentCount = packetMatch?.fragments.length ?? 0;
-
-      return {
-        ...entry,
-        packet_fragment_count: packetFragmentCount,
-        coverage_complete:
-          packetFragmentCount > 0 &&
-          Number(entry.fragment_feedback_count) === packetFragmentCount,
-      };
-    });
+    feedbackEvents = allFeedbackEvents
+      .filter((entry) => entry.purpose_id === purposeId)
+      .slice(0, 12);
 
     feedbackEvent = feedbackEvents[0] ?? null;
 
@@ -181,11 +234,33 @@ function loadAthenaState() {
     ).rows;
   }
 
+  const purposeRequests = purposes.map((purposeEntry) => {
+    const packets = annotatePacketHistory(
+      allPacketHistory.filter(
+        (packetEntry) => packetEntry.purpose_id === purposeEntry.purpose_id,
+      ),
+      allFeedbackEvents.filter(
+        (event) => event.purpose_id === purposeEntry.purpose_id,
+      ),
+      session,
+    );
+
+    return {
+      ...purposeEntry,
+      packet_count: packets.length,
+      latest_packet_id: packets[0]?.packet_id ?? null,
+      oldest_packet_id: packets[packets.length - 1]?.packet_id ?? null,
+      is_session_purpose: purposeEntry.purpose_id === session.purpose_id,
+      packets,
+    };
+  });
+
   return {
     session,
     purpose,
     packet,
     packet_history: packetHistory,
+    purpose_requests: purposeRequests,
     all_fragments: allFragments,
     feedback_event: feedbackEvent,
     feedback_events: feedbackEvents,
@@ -206,6 +281,7 @@ function athenaApiPlugin() {
     purpose: null,
     packet: null,
     packet_history: [],
+    purpose_requests: [],
     all_fragments: [],
     feedback_event: null,
     feedback_events: [],

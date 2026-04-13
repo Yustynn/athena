@@ -1,11 +1,16 @@
 import "./style.css";
 
 const POLL_MS = 3000;
+const VIEWS = {
+  dashboard: "dashboard",
+  purposeMap: "purpose-map",
+};
 
 const EMPTY_STATE = {
   purpose: null,
   packet: null,
   packet_history: [],
+  purpose_requests: [],
   all_fragments: [],
   feedback_event: null,
   feedback_events: [],
@@ -84,6 +89,15 @@ function scoreClass(score) {
 
 function statusPill(label, toneClass) {
   return `<span class="rounded-full px-2 py-1 text-[10px] uppercase tracking-[0.22em] ring-1 ${toneClass}">${label}</span>`;
+}
+
+function currentView() {
+  const hash = window.location.hash.replace(/^#\/?/, "");
+  return hash === VIEWS.purposeMap ? VIEWS.purposeMap : VIEWS.dashboard;
+}
+
+function viewHref(view) {
+  return view === VIEWS.purposeMap ? "#/purpose-map" : "#/";
 }
 
 function selectedPacket(state) {
@@ -191,6 +205,399 @@ function renderFragmentRows(fragments, feedbackRows, activePacketId) {
     .join("");
 }
 
+function renderTopNav(activeView) {
+  return `
+    <div class="view-switch">
+      <a class="view-tab ${activeView === VIEWS.dashboard ? "is-active" : ""}" href="${viewHref(VIEWS.dashboard)}" data-view-select="${VIEWS.dashboard}">dashboard</a>
+      <a class="view-tab ${activeView === VIEWS.purposeMap ? "is-active" : ""}" href="${viewHref(VIEWS.purposeMap)}" data-view-select="${VIEWS.purposeMap}">purpose map</a>
+    </div>
+  `;
+}
+
+function renderDashboard(state) {
+  const packetHistory = state.packet_history ?? [];
+  const activePacket = selectedPacket(state);
+  const activePacketFragments = activePacket?.fragments ?? [];
+  const activePacketFeedback = activePacket
+    ? feedbackRowsForPacket(state, activePacket.packet_id)
+    : [];
+  const activePacketEvent = activePacket
+    ? feedbackEventForPacket(state, activePacket.packet_id)
+    : null;
+  const fragments = state.all_fragments ?? [];
+  const feedbackRows = state.feedback_fragments ?? [];
+  const feedbackEvents = state.feedback_events ?? [];
+  const recentFeedback = state.recent_feedback ?? [];
+  const scoreRows = computeScoreRows(state.scores ?? {});
+
+  return `
+    <section class="dashboard-grid">
+      <aside class="rail">
+        <article class="panel">
+          <div class="panel-head">
+            <span class="panel-kicker">Purpose</span>
+            <span class="tiny-id">${state.purpose?.purpose_id ?? "none"}</span>
+          </div>
+          <h2 class="panel-title">${state.purpose?.statement ?? "No active Athena purpose in session"}</h2>
+          <p class="panel-copy">${
+            state.purpose?.success_criteria ??
+            (lastError
+              ? `Live read failed: ${lastError}`
+              : "Waiting for live Athena state.")
+          }</p>
+          <dl class="kv-table">
+            <div class="kv-row"><dt>active packet</dt><dd>${activePacket?.packet_id ?? "none"}</dd></div>
+            <div class="kv-row"><dt>session purpose</dt><dd>${state.session?.purpose_id ?? "none"}</dd></div>
+            <div class="kv-row"><dt>session packet</dt><dd>${state.session?.packet_id ?? "none"}</dd></div>
+            <div class="kv-row"><dt>repo root</dt><dd>${state.meta?.repo_root ?? "unknown"}</dd></div>
+          </dl>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <span class="panel-kicker">Packet Timeline</span>
+            <span class="tiny-id">${packetHistory.length} versions</span>
+          </div>
+          <div class="timeline-list">
+            ${
+              packetHistory.length
+                ? packetHistory
+                    .map((packet, index) => {
+                      const event = feedbackEventForPacket(state, packet.packet_id);
+                      const coverageLabel = event
+                        ? `${event.fragment_feedback_count}/${event.packet_fragment_count || packet.fragments.length}`
+                        : "pending";
+
+                      return `
+                        <button class="timeline-row ${packet.packet_id === activePacket?.packet_id ? "is-active" : ""}" data-packet-select="${packet.packet_id}">
+                          <div class="timeline-top">
+                            <span class="timeline-index">v${packetHistory.length - index}</span>
+                            <span class="tiny-id">${packet.packet_id}</span>
+                          </div>
+                          <div class="timeline-meta">
+                            <span>${packet.fragments.length} fragments</span>
+                            <span>${event?.outcome ?? "no feedback"}</span>
+                            <span>coverage ${coverageLabel}</span>
+                          </div>
+                        </button>
+                      `;
+                    })
+                    .join("")
+                : `<div class="empty-row">No packet history for purpose.</div>`
+            }
+          </div>
+        </article>
+      </aside>
+
+      <section class="panel-stack">
+        <section class="panel panel-main">
+          <div class="panel-head">
+            <div>
+              <span class="panel-kicker">Packet Explorer</span>
+              <h2 class="panel-title">selected packet fragments</h2>
+            </div>
+            <span class="tiny-id">${activePacket?.packet_id ?? "none"}</span>
+          </div>
+
+          <div class="packet-summary-grid">
+            <div class="summary-row"><span>packet fragments</span><strong>${activePacketFragments.length}</strong></div>
+            <div class="summary-row"><span>feedback outcome</span><strong>${activePacketEvent?.outcome ?? "none"}</strong></div>
+            <div class="summary-row"><span>coverage</span><strong>${
+              activePacketEvent
+                ? `${activePacketEvent.fragment_feedback_count}/${activePacketEvent.packet_fragment_count}`
+                : "pending"
+            }</strong></div>
+            <div class="summary-row"><span>feedback id</span><strong>${activePacketEvent?.feedback_id ?? "none"}</strong></div>
+          </div>
+
+          <div class="fragment-list">
+            ${renderFragmentRows(activePacketFragments, activePacketFeedback, activePacket?.packet_id)}
+          </div>
+        </section>
+
+        <section class="panel panel-main">
+          <div class="panel-head">
+            <div>
+              <span class="panel-kicker">Fragment Store</span>
+              <h2 class="panel-title">all stored fragments</h2>
+            </div>
+            <div class="dense-meta">
+              <span>id</span>
+              <span>summary</span>
+              <span>feedback</span>
+            </div>
+          </div>
+
+          <div class="fragment-list">
+            ${renderFragmentRows(fragments, feedbackRows, activePacket?.packet_id)}
+          </div>
+        </section>
+      </section>
+
+      <aside class="rail">
+        <article class="panel">
+          <div class="panel-head">
+            <span class="panel-kicker">Scores</span>
+            <span class="tiny-id">${state.scores?.total ?? 0} rows</span>
+          </div>
+          <div class="score-list">
+            ${
+              scoreRows.length
+                ? scoreRows
+                    .map(
+                      ([key, value]) => `
+                        <div class="summary-row">
+                          <span>${key}</span>
+                          <strong>${value}</strong>
+                        </div>
+                      `,
+                    )
+                    .join("")
+                : `<div class="empty-row">No score rows yet.</div>`
+            }
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <span class="panel-kicker">Feedback Events</span>
+            <span class="tiny-id">${feedbackEvents.length} events</span>
+          </div>
+          <div class="feedback-list">
+            ${
+              feedbackEvents.length
+                ? feedbackEvents
+                    .map(
+                      (entry) => `
+                        <div class="feedback-row">
+                          <div class="feedback-topline">
+                            <span class="fragment-id">${entry.feedback_id}</span>
+                            ${statusPill(entry.outcome, outcomeTone[entry.outcome] ?? outcomeTone.partial)}
+                          </div>
+                          <div class="history-meta">
+                            <span>${entry.packet_id}</span>
+                            <span>${entry.fragment_feedback_count}/${entry.packet_fragment_count || 0} rows</span>
+                            <span>${entry.coverage_complete ? "coverage complete" : "coverage partial"}</span>
+                          </div>
+                        </div>
+                      `,
+                    )
+                    .join("")
+                : `<div class="empty-row">No feedback events yet.</div>`
+            }
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <span class="panel-kicker">Recent Feedback</span>
+            <span class="tiny-id">${recentFeedback.length} rows</span>
+          </div>
+          <div class="feedback-list">
+            ${recentFeedback
+              .slice(0, 8)
+              .map(
+                (entry) => `
+                  <button class="history-row" data-fragment-open="${entry.fragment_id}">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="fragment-id">${entry.fragment_id}</span>
+                      <span class="${scoreClass(state.fragment_scores?.[entry.fragment_id] ?? 0)}">score ${state.fragment_scores?.[entry.fragment_id] ?? 0}</span>
+                    </div>
+                    <div class="history-meta">
+                      <span>${entry.verdict}</span>
+                      <span>${entry.outcome}</span>
+                      <span>${entry.packet_id}</span>
+                    </div>
+                    <p>${entry.reason || "No reason."}</p>
+                  </button>
+                `,
+              )
+              .join("")}
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <span class="panel-kicker">Doc Gaps</span>
+            <span class="tiny-id">next backend slices</span>
+          </div>
+          <div class="step-list">
+            <div class="step-row is-active">packet timeline now visible</div>
+            <div class="step-row is-active">feedback coverage now visible</div>
+            <div class="step-row is-active">selected packet inspection now visible</div>
+            <div class="step-row is-active">purpose request to packet map now visible</div>
+            <div class="step-row">orientation_response not persisted yet</div>
+            <div class="step-row">correction_packet not persisted yet</div>
+          </div>
+          ${
+            lastError
+              ? `<p class="error-copy">${lastError}</p>`
+              : `<p class="panel-copy mt-3">Design docs mention orientation and correction loop, but current Dolt schema only stores purposes, packets, fragments, and feedback.</p>`
+          }
+        </article>
+      </aside>
+    </section>
+  `;
+}
+
+function renderFragmentPreviewList(fragments) {
+  if (!fragments.length) {
+    return `<div class="empty-row">No packet fragments.</div>`;
+  }
+
+  return `
+    <div class="map-fragment-list">
+      ${fragments
+        .slice(0, 4)
+        .map(
+          (fragment) => `
+            <div class="map-fragment-chip">
+              <span class="fragment-kind ${fragmentKindTone[fragment.kind] ?? ""}">${fragment.kind}</span>
+              <strong>${fragment.summary ?? fragment.fragment_id}</strong>
+            </div>
+          `,
+        )
+        .join("")}
+      ${
+        fragments.length > 4
+          ? `<div class="map-fragment-chip"><span class="fragment-kind">more</span><strong>+${fragments.length - 4} fragments</strong></div>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderPurposeMap(state) {
+  const purposeRequests = state.purpose_requests ?? [];
+  const totalPackets = purposeRequests.reduce(
+    (sum, entry) => sum + (entry.packet_count ?? 0),
+    0,
+  );
+
+  return `
+    <section class="map-layout">
+      <article class="panel panel-main">
+        <div class="panel-head">
+          <div>
+            <span class="panel-kicker">Purpose Request Map</span>
+            <h2 class="panel-title">request inputs to packet lineage</h2>
+          </div>
+          <span class="tiny-id">${purposeRequests.length} purposes</span>
+        </div>
+        <p class="panel-copy">Each purpose request shows request text, success criteria, then packet versions generated for that purpose. Packet cards show carryover, new, dropped fragments, plus latest feedback status when present.</p>
+        <div class="packet-summary-grid">
+          <div class="summary-row"><span>purpose requests</span><strong>${purposeRequests.length}</strong></div>
+          <div class="summary-row"><span>packet versions</span><strong>${totalPackets}</strong></div>
+          <div class="summary-row"><span>session purpose</span><strong>${state.session?.purpose_id ?? "none"}</strong></div>
+          <div class="summary-row"><span>session packet</span><strong>${state.session?.packet_id ?? "none"}</strong></div>
+        </div>
+      </article>
+
+      <section class="map-purpose-list">
+        ${
+          purposeRequests.length
+            ? purposeRequests
+                .map((purposeEntry, index) => {
+                  const packets = purposeEntry.packets ?? [];
+
+                  return `
+                    <article class="panel map-purpose-card">
+                      <div class="panel-head">
+                        <div>
+                          <span class="panel-kicker">Purpose ${purposeRequests.length - index}</span>
+                          <h2 class="panel-title">${purposeEntry.statement}</h2>
+                        </div>
+                        <div class="map-card-badges">
+                          <div class="badge">${purposeEntry.status}</div>
+                          ${purposeEntry.is_session_purpose ? `<div class="badge badge-cyan">session purpose</div>` : ""}
+                          <div class="badge">${purposeEntry.packet_count} packets</div>
+                        </div>
+                      </div>
+
+                      <div class="map-purpose-grid">
+                        <section class="map-request-column">
+                          <div class="map-request-block">
+                            <div class="map-label">request</div>
+                            <p>${purposeEntry.statement}</p>
+                          </div>
+                          <div class="map-request-block">
+                            <div class="map-label">success criteria</div>
+                            <p>${purposeEntry.success_criteria}</p>
+                          </div>
+                          <dl class="kv-table">
+                            <div class="kv-row"><dt>purpose id</dt><dd>${purposeEntry.purpose_id}</dd></div>
+                            <div class="kv-row"><dt>latest packet</dt><dd>${purposeEntry.latest_packet_id ?? "none"}</dd></div>
+                            <div class="kv-row"><dt>oldest packet</dt><dd>${purposeEntry.oldest_packet_id ?? "none"}</dd></div>
+                          </dl>
+                        </section>
+
+                        <section class="map-packet-column">
+                          ${
+                            packets.length
+                              ? packets
+                                  .map(
+                                    (packetEntry, packetIndex) => `
+                                      <article class="map-packet-card">
+                                        <div class="map-packet-top">
+                                          <div>
+                                            <div class="map-label">packet v${packets.length - packetIndex}</div>
+                                            <div class="tiny-id">${packetEntry.packet_id}</div>
+                                          </div>
+                                          <div class="map-card-badges">
+                                            ${
+                                              packetEntry.feedback_event
+                                                ? statusPill(
+                                                    packetEntry.feedback_event.outcome,
+                                                    outcomeTone[packetEntry.feedback_event.outcome] ??
+                                                      outcomeTone.partial,
+                                                  )
+                                                : `<div class="badge">pending feedback</div>`
+                                            }
+                                            ${
+                                              packetEntry.is_session_packet
+                                                ? `<div class="badge badge-cyan">session packet</div>`
+                                                : ""
+                                            }
+                                          </div>
+                                        </div>
+
+                                        <div class="map-stats-row">
+                                          <div class="summary-row"><span>fragments</span><strong>${packetEntry.fragment_count}</strong></div>
+                                          <div class="summary-row"><span>new</span><strong>${packetEntry.new_count}</strong></div>
+                                          <div class="summary-row"><span>carryover</span><strong>${packetEntry.carryover_count}</strong></div>
+                                          <div class="summary-row"><span>dropped</span><strong>${packetEntry.dropped_count}</strong></div>
+                                        </div>
+
+                                        ${
+                                          packetEntry.feedback_event
+                                            ? `<div class="history-meta">
+                                                 <span>${packetEntry.feedback_event.feedback_id}</span>
+                                                 <span>${packetEntry.feedback_event.fragment_feedback_count}/${packetEntry.feedback_event.packet_fragment_count} rows</span>
+                                                 <span>${packetEntry.feedback_event.coverage_complete ? "coverage complete" : "coverage partial"}</span>
+                                               </div>`
+                                            : ""
+                                        }
+
+                                        ${renderFragmentPreviewList(packetEntry.fragments ?? [])}
+                                      </article>
+                                    `,
+                                  )
+                                  .join("")
+                              : `<div class="empty-row">No packets yet for this purpose.</div>`
+                          }
+                        </section>
+                      </div>
+                    </article>
+                  `;
+                })
+                .join("")
+            : `<article class="panel"><div class="empty-row">No persisted purposes yet.</div></article>`
+        }
+      </section>
+    </section>
+  `;
+}
+
 function openFragmentModal(fragmentId) {
   selectedFragmentId = fragmentId;
   render();
@@ -219,6 +626,14 @@ function attachEvents() {
     });
   });
 
+  document.querySelectorAll("[data-view-select]").forEach((node) => {
+    node.addEventListener("click", () => {
+      if (node.dataset.viewSelect === VIEWS.purposeMap) {
+        selectedFragmentId = null;
+      }
+    });
+  });
+
   document.querySelectorAll("[data-close-modal]").forEach((node) => {
     node.addEventListener("click", closeFragmentModal);
   });
@@ -233,22 +648,11 @@ function attachEvents() {
 
 function render() {
   const state = currentState;
-  syncSelectedPacket(state);
-
+  const activeView = currentView();
   const packetHistory = state.packet_history ?? [];
-  const activePacket = selectedPacket(state);
-  const activePacketFragments = activePacket?.fragments ?? [];
-  const activePacketFeedback = activePacket
-    ? feedbackRowsForPacket(state, activePacket.packet_id)
-    : [];
-  const activePacketEvent = activePacket
-    ? feedbackEventForPacket(state, activePacket.packet_id)
-    : null;
-  const fragments = state.all_fragments ?? [];
-  const feedbackRows = state.feedback_fragments ?? [];
   const feedbackEvents = state.feedback_events ?? [];
-  const recentFeedback = state.recent_feedback ?? [];
-  const scoreRows = computeScoreRows(state.scores ?? {});
+  const purposeRequests = state.purpose_requests ?? [];
+  const fragments = state.all_fragments ?? [];
   const polledAt = compactTime(state.meta?.polled_at);
   const modalRows = selectedFragmentId ? fragmentHistoryRows(selectedFragmentId) : [];
   const modalFragment = selectedFragmentId ? findFragment(state, selectedFragmentId) : null;
@@ -257,6 +661,8 @@ function render() {
     : lastError
       ? "api error"
       : "loading";
+
+  syncSelectedPacket(state);
 
   app.innerHTML = `
     <main class="min-h-screen bg-grid text-stone-100">
@@ -271,223 +677,20 @@ function render() {
           </div>
           <div class="toolbar-block toolbar-block-right">
             <div class="badge">${state.purpose?.status ?? "no purpose"}</div>
-            <div class="badge">${fragments.length} store</div>
-            <div class="badge">${packetHistory.length} packets</div>
+            <div class="badge">${purposeRequests.length} purposes</div>
+            <div class="badge">${packetHistory.length} active packets</div>
             <div class="badge">${feedbackEvents.length} events</div>
-            <div class="badge badge-cyan">packet timeline</div>
-            <div class="badge badge-cyan">coverage stats</div>
+            <div class="badge">${fragments.length} store</div>
             <div class="badge ${lastError ? "badge-warn" : "badge-cyan"}">${liveBadge}</div>
           </div>
         </header>
 
-        <section class="dashboard-grid">
-          <aside class="rail">
-            <article class="panel">
-              <div class="panel-head">
-                <span class="panel-kicker">Purpose</span>
-                <span class="tiny-id">${state.purpose?.purpose_id ?? "none"}</span>
-              </div>
-              <h2 class="panel-title">${state.purpose?.statement ?? "No active Athena purpose in session"}</h2>
-              <p class="panel-copy">${
-                state.purpose?.success_criteria ??
-                (lastError
-                  ? `Live read failed: ${lastError}`
-                  : "Waiting for live Athena state.")
-              }</p>
-              <dl class="kv-table">
-                <div class="kv-row"><dt>active packet</dt><dd>${activePacket?.packet_id ?? "none"}</dd></div>
-                <div class="kv-row"><dt>session purpose</dt><dd>${state.session?.purpose_id ?? "none"}</dd></div>
-                <div class="kv-row"><dt>session packet</dt><dd>${state.session?.packet_id ?? "none"}</dd></div>
-                <div class="kv-row"><dt>repo root</dt><dd>${state.meta?.repo_root ?? "unknown"}</dd></div>
-              </dl>
-            </article>
+        ${renderTopNav(activeView)}
 
-            <article class="panel">
-              <div class="panel-head">
-                <span class="panel-kicker">Packet Timeline</span>
-                <span class="tiny-id">${packetHistory.length} versions</span>
-              </div>
-              <div class="timeline-list">
-                ${
-                  packetHistory.length
-                    ? packetHistory
-                        .map((packet, index) => {
-                          const event = feedbackEventForPacket(state, packet.packet_id);
-                          const coverageLabel = event
-                            ? `${event.fragment_feedback_count}/${event.packet_fragment_count || packet.fragments.length}`
-                            : "pending";
-
-                          return `
-                            <button class="timeline-row ${packet.packet_id === activePacket?.packet_id ? "is-active" : ""}" data-packet-select="${packet.packet_id}">
-                              <div class="timeline-top">
-                                <span class="timeline-index">v${packetHistory.length - index}</span>
-                                <span class="tiny-id">${packet.packet_id}</span>
-                              </div>
-                              <div class="timeline-meta">
-                                <span>${packet.fragments.length} fragments</span>
-                                <span>${event?.outcome ?? "no feedback"}</span>
-                                <span>coverage ${coverageLabel}</span>
-                              </div>
-                            </button>
-                          `;
-                        })
-                        .join("")
-                    : `<div class="empty-row">No packet history for purpose.</div>`
-                }
-              </div>
-            </article>
-          </aside>
-
-          <section class="panel-stack">
-            <section class="panel panel-main">
-              <div class="panel-head">
-                <div>
-                  <span class="panel-kicker">Packet Explorer</span>
-                  <h2 class="panel-title">selected packet fragments</h2>
-                </div>
-                <span class="tiny-id">${activePacket?.packet_id ?? "none"}</span>
-              </div>
-
-              <div class="packet-summary-grid">
-                <div class="summary-row"><span>packet fragments</span><strong>${activePacketFragments.length}</strong></div>
-                <div class="summary-row"><span>feedback outcome</span><strong>${activePacketEvent?.outcome ?? "none"}</strong></div>
-                <div class="summary-row"><span>coverage</span><strong>${
-                  activePacketEvent
-                    ? `${activePacketEvent.fragment_feedback_count}/${activePacketEvent.packet_fragment_count}`
-                    : "pending"
-                }</strong></div>
-                <div class="summary-row"><span>feedback id</span><strong>${activePacketEvent?.feedback_id ?? "none"}</strong></div>
-              </div>
-
-              <div class="fragment-list">
-                ${renderFragmentRows(activePacketFragments, activePacketFeedback, activePacket?.packet_id)}
-              </div>
-            </section>
-
-            <section class="panel panel-main">
-              <div class="panel-head">
-                <div>
-                  <span class="panel-kicker">Fragment Store</span>
-                  <h2 class="panel-title">all stored fragments</h2>
-                </div>
-                <div class="dense-meta">
-                  <span>id</span>
-                  <span>summary</span>
-                  <span>feedback</span>
-                </div>
-              </div>
-
-              <div class="fragment-list">
-                ${renderFragmentRows(fragments, feedbackRows, activePacket?.packet_id)}
-              </div>
-            </section>
-          </section>
-
-          <aside class="rail">
-            <article class="panel">
-              <div class="panel-head">
-                <span class="panel-kicker">Scores</span>
-                <span class="tiny-id">${state.scores?.total ?? 0} rows</span>
-              </div>
-              <div class="score-list">
-                ${
-                  scoreRows.length
-                    ? scoreRows
-                        .map(
-                          ([key, value]) => `
-                            <div class="summary-row">
-                              <span>${key}</span>
-                              <strong>${value}</strong>
-                            </div>
-                          `,
-                        )
-                        .join("")
-                    : `<div class="empty-row">No score rows yet.</div>`
-                }
-              </div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-head">
-                <span class="panel-kicker">Feedback Events</span>
-                <span class="tiny-id">${feedbackEvents.length} events</span>
-              </div>
-              <div class="feedback-list">
-                ${
-                  feedbackEvents.length
-                    ? feedbackEvents
-                        .map(
-                          (entry) => `
-                            <div class="feedback-row">
-                              <div class="feedback-topline">
-                                <span class="fragment-id">${entry.feedback_id}</span>
-                                ${statusPill(entry.outcome, outcomeTone[entry.outcome] ?? outcomeTone.partial)}
-                              </div>
-                              <div class="history-meta">
-                                <span>${entry.packet_id}</span>
-                                <span>${entry.fragment_feedback_count}/${entry.packet_fragment_count || 0} rows</span>
-                                <span>${entry.coverage_complete ? "coverage complete" : "coverage partial"}</span>
-                              </div>
-                            </div>
-                          `,
-                        )
-                        .join("")
-                    : `<div class="empty-row">No feedback events yet.</div>`
-                }
-              </div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-head">
-                <span class="panel-kicker">Recent Feedback</span>
-                <span class="tiny-id">${recentFeedback.length} rows</span>
-              </div>
-              <div class="feedback-list">
-                ${recentFeedback
-                  .slice(0, 8)
-                  .map(
-                    (entry) => `
-                      <button class="history-row" data-fragment-open="${entry.fragment_id}">
-                        <div class="flex items-center justify-between gap-2">
-                          <span class="fragment-id">${entry.fragment_id}</span>
-                          <span class="${scoreClass(state.fragment_scores?.[entry.fragment_id] ?? 0)}">score ${state.fragment_scores?.[entry.fragment_id] ?? 0}</span>
-                        </div>
-                        <div class="history-meta">
-                          <span>${entry.verdict}</span>
-                          <span>${entry.outcome}</span>
-                          <span>${entry.packet_id}</span>
-                        </div>
-                        <p>${entry.reason || "No reason."}</p>
-                      </button>
-                    `,
-                  )
-                  .join("")}
-              </div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-head">
-                <span class="panel-kicker">Doc Gaps</span>
-                <span class="tiny-id">next backend slices</span>
-              </div>
-              <div class="step-list">
-                <div class="step-row is-active">packet timeline now visible</div>
-                <div class="step-row is-active">feedback coverage now visible</div>
-                <div class="step-row is-active">selected packet inspection now visible</div>
-                <div class="step-row">orientation_response not persisted yet</div>
-                <div class="step-row">correction_packet not persisted yet</div>
-              </div>
-              ${
-                lastError
-                  ? `<p class="error-copy">${lastError}</p>`
-                  : `<p class="panel-copy mt-3">Design docs mention orientation and correction loop, but current Dolt schema only stores purposes, packets, fragments, and feedback.</p>`
-              }
-            </article>
-          </aside>
-        </section>
+        ${activeView === VIEWS.purposeMap ? renderPurposeMap(state) : renderDashboard(state)}
 
         ${
-          modalFragment
+          modalFragment && activeView === VIEWS.dashboard
             ? `
               <div class="modal-overlay" data-modal-overlay>
                 <div class="modal-card">
@@ -557,4 +760,11 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && selectedFragmentId) {
     closeFragmentModal();
   }
+});
+
+window.addEventListener("hashchange", () => {
+  if (currentView() === VIEWS.purposeMap) {
+    selectedFragmentId = null;
+  }
+  render();
 });
