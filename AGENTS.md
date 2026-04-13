@@ -55,11 +55,17 @@ Usage rules:
 - if scope or done condition changes materially, update purpose before continuing
 - at end of substantive work, after verification or learning, apply Athena feedback for packet used during work
 - prefer wrapper defaults over manual purpose/packet id copying; wrappers reuse `.athena/session.json`
-- only write `new_fragments` for durable reusable knowledge, not transient task chatter
-- durable reusable knowledge includes implementation lessons, not only product doctrine
-- add `new_fragments` when session produces reusable lessons about storage access, performance limits, caching, polling, state-model distinctions, observability, or failure modes
-- heuristic: if answer to "what should future agent do differently?" is non-trivial and likely reusable, write fragment
-- do not store raw stack traces, one-off command output, ports, or transient debugging chatter; do store stable conclusions extracted from them
+- write `new_fragments` when session yields knowledge worth preserving for future work
+- saved knowledge can include implementation lessons, discovery/orientation pointers, canonical-source pointers, workflow shape, or task-specific gap snapshots when useful
+- add `new_fragments` when session produces lessons about storage access, performance limits, caching, polling, state-model distinctions, observability, or failure modes
+- add `new_fragments` when session reveals where future agents should start, which doc or file is canonical, which execution order or vertical-slice roadmap should guide work, or which gaps remain open
+- prefer concise fragments over copied docs: save what future agent should know next, with pointers when they help
+- heuristic: if answer to "what should future agent do differently?" or "what would have oriented future agent faster?" is non-trivial and likely reusable, write fragment
+- end-of-task Athena prompt set:
+  - "What assumption did I make that cost time or risked wrong implementation? What is correction?"
+  - "What small fragment would have improved orientation or discovery? Where is canonical source for fuller detail?"
+  - "What execution order, slice boundary, or workflow constraint should future agent follow?"
+- do not store raw stack traces or one-off command output verbatim; summarize what mattered instead
 - if Athena output conflicts with repo reality or tests, trust repo reality first, then write corrective feedback
 - `scripts/athena-dev` is for experiments only. Do not write its outputs into canonical Athena memory unless tests pass or user explicitly approves promotion
 
@@ -153,7 +159,11 @@ bd close <id>         # Complete work
    ```
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed
-7. **Session close** - Provide context for next session and ask: "What durable lessons from this session would change future implementation choices?" Convert answer into Athena `new_fragments`
+7. **Session close** - Provide context for next session and ask all:
+   - "What assumption did I make that cost time or risked wrong implementation? What is correction?"
+   - "What small fragment would have improved orientation or discovery? Where is canonical source for fuller detail?"
+   - "What execution order, slice boundary, or workflow constraint should future agent follow?"
+   Convert useful answers into Athena `new_fragments`
 
 **CRITICAL RULES:**
 - Work is NOT complete until `git push` succeeds
