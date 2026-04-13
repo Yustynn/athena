@@ -1,0 +1,13 @@
+diff --git a/cachelib.py b/cachelib.py
+--- a/cachelib.py
++++ b/cachelib.py
+@@ -14,6 +14,9 @@ class LRUCache:
+     def __setitem__(self, key, value):
+         if key in self._mapping:
+             self._queue.remove(key)
++        elif self.capacity == 0:
++            self._mapping.clear()
++            return
+         elif len(self._mapping) == self.capacity:
+             del self._mapping[self._queue.popleft()]
+ 

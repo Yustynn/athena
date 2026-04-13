@@ -1,0 +1,26 @@
+diff --git a/tests/test_hidden_lru_step2.py b/tests/test_hidden_lru_step2.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_hidden_lru_step2.py
+@@ -0,0 +1,21 @@
++from jinja2.utils import LRUCache
++
++
++def test_peek_does_not_change_order():
++    cache = LRUCache(3)
++    cache["a"] = 1
++    cache["b"] = 2
++    cache["c"] = 3
++
++    assert cache.peek("a") == 1
++    assert cache.keys() == ["c", "b", "a"]
++    assert cache["a"] == 1
++    assert cache.keys() == ["a", "c", "b"]
++
++
++def test_peek_uses_default_for_missing():
++    cache = LRUCache(2)
++    cache["a"] = 1
++
++    assert cache.peek("missing") is None
++    assert cache.peek("missing", 42) == 42

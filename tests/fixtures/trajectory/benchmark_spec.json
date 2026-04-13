@@ -1,0 +1,89 @@
+{
+  "name": "trajectory_fixture_v1",
+  "sequence_id": "cache_sequence",
+  "repo": {
+    "repo_id": "cache_fixture",
+    "source": {
+      "kind": "local",
+      "path": "repo"
+    },
+    "setup_commands": []
+  },
+  "runner": {
+    "command": [
+      "/bin/bash",
+      "./fake_runner.sh"
+    ],
+    "env": {}
+  },
+  "steps": [
+    {
+      "step_id": "step1_zero_capacity",
+      "prompt_path": "prompts/step1.md",
+      "verifier": {
+        "parser": "unittest",
+        "command": [
+          "python3",
+          "-m",
+          "unittest",
+          "-v",
+          "tests.test_public",
+          "tests.test_hidden_step1"
+        ],
+        "test_patch_path": "hidden/step1.diff",
+        "fail_to_pass": [
+          "test_zero_capacity_discards_writes (tests.test_hidden_step1.HiddenStep1.test_zero_capacity_discards_writes)"
+        ],
+        "pass_to_pass": [
+          "test_items_promote_recency (tests.test_public.PublicTests.test_items_promote_recency)"
+        ]
+      }
+    },
+    {
+      "step_id": "step2_peek",
+      "prompt_path": "prompts/step2.md",
+      "verifier": {
+        "parser": "unittest",
+        "command": [
+          "python3",
+          "-m",
+          "unittest",
+          "-v",
+          "tests.test_public",
+          "tests.test_hidden_step2"
+        ],
+        "test_patch_path": "hidden/step2.diff",
+        "fail_to_pass": [
+          "test_peek_does_not_update_recency (tests.test_hidden_step2.HiddenStep2.test_peek_does_not_update_recency)",
+          "test_peek_respects_default (tests.test_hidden_step2.HiddenStep2.test_peek_respects_default)"
+        ],
+        "pass_to_pass": [
+          "test_items_promote_recency (tests.test_public.PublicTests.test_items_promote_recency)"
+        ]
+      }
+    },
+    {
+      "step_id": "step3_pop",
+      "prompt_path": "prompts/step3.md",
+      "verifier": {
+        "parser": "unittest",
+        "command": [
+          "python3",
+          "-m",
+          "unittest",
+          "-v",
+          "tests.test_public",
+          "tests.test_hidden_step3"
+        ],
+        "test_patch_path": "hidden/step3.diff",
+        "fail_to_pass": [
+          "test_pop_removes_key_without_disturbing_recency (tests.test_hidden_step3.HiddenStep3.test_pop_removes_key_without_disturbing_recency)",
+          "test_pop_uses_default_or_raises (tests.test_hidden_step3.HiddenStep3.test_pop_uses_default_or_raises)"
+        ],
+        "pass_to_pass": [
+          "test_items_promote_recency (tests.test_public.PublicTests.test_items_promote_recency)"
+        ]
+      }
+    }
+  ]
+}

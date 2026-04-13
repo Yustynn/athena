@@ -1,0 +1,27 @@
+--- a/cachelib.py
++++ b/cachelib.py
+@@ -1,6 +1,8 @@
+ from collections import deque
+ 
++missing = object()
+ 
++
+ class LRUCache:
+     def __init__(self, capacity):
+         self.capacity = capacity
+@@ -38,6 +40,15 @@
+ 
+         return default
+ 
++    def pop(self, key, default=missing):
++        if key in self._mapping:
++            self._queue.remove(key)
++            return self._mapping.pop(key)
++
++        if default is missing:
++            raise KeyError(key)
++        return default
++
+     def keys(self):
+         keys = list(self._queue)
+         keys.reverse()

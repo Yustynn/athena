@@ -1,0 +1,19 @@
+diff --git a/tests/test_hidden_step1.py b/tests/test_hidden_step1.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_hidden_step1.py
+@@ -0,0 +1,13 @@
++import unittest
++
++from cachelib import LRUCache
++
++
++class HiddenStep1(unittest.TestCase):
++    def test_zero_capacity_discards_writes(self):
++        cache = LRUCache(0)
++        cache["a"] = 1
++        cache["b"] = 2
++
++        self.assertEqual(len(cache), 0)
++        self.assertNotIn("a", cache)
++        self.assertEqual(cache.keys(), [])

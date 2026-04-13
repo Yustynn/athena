@@ -2,9 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-bench_root="$repo_root/.athena/bench-dev"
-db_path="$bench_root/db"
-dolt_home="$bench_root/.dolt-home-db"
+bench_parent_root="$repo_root/.athena/bench-dev"
+manual_bench_root="$bench_parent_root/manual"
 
 usage() {
   cat <<'EOF'
@@ -13,13 +12,16 @@ usage:
   scripts/athena-bench clear
   scripts/athena-bench retrieval [--spec path] [--keep-dev-db]
   scripts/athena-bench creation [--spec path] [--proposals path] [--keep-dev-db]
+  scripts/athena-bench trajectory [--spec path] [--athena-mode off|current] [--keep-workdir] [--keep-dev-db]
 
 defaults:
   creation proposals path: benchmarks/creation/proposals/baseline.json
 
 notes:
-  Initializes isolated dev Athena Dolt state under .athena/bench-dev.
-  Clears that dev state after benchmark run unless --keep-dev-db is set.
+  retrieval, creation, and trajectory each initialize isolated dev Athena Dolt state under .athena/bench-dev.
+  setup initializes shared manual state under .athena/bench-dev/manual.
+  clear removes all state under .athena/bench-dev.
+  Benchmark run state clears after run unless --keep-dev-db is set.
   Does not touch tracked dogfood state in .athena/db.
 EOF
 }
@@ -30,14 +32,24 @@ die() {
 }
 
 clear_dev_state() {
-  rm -rf "$bench_root"
+  local root="$1"
+  rm -rf "$root"
 }
 
 setup_dev_state() {
-  clear_dev_state
-  mkdir -p "$bench_root"
+  local root="$1"
+  local db_path="$root/db"
+  local dolt_home="$root/.dolt-home-db"
+  clear_dev_state "$root"
+  mkdir -p "$root"
   ATHENA_DB_PATH="$db_path" ATHENA_DOLT_HOME="$dolt_home" \
     "$repo_root/scripts/athena" latest-state >/dev/null
+}
+
+new_bench_root() {
+  local label="$1"
+  mkdir -p "$bench_parent_root"
+  mktemp -d "$bench_parent_root/$label.XXXXXX"
 }
 
 run_benchmark() {
@@ -50,6 +62,13 @@ run_benchmark() {
     shift
   fi
 
+  local bench_root
+  local db_path
+  local dolt_home
+  bench_root="$(new_bench_root "$subcommand")"
+  db_path="$bench_root/db"
+  dolt_home="$bench_root/.dolt-home-db"
+
   if [[ "$subcommand" == "creation" ]]; then
     local saw_proposals="false"
     local arg
@@ -59,24 +78,32 @@ run_benchmark() {
         break
       fi
     done
-    setup_dev_state
+    setup_dev_state "$bench_root"
     if [[ "$keep_dev_db" != "true" ]]; then
-      trap clear_dev_state EXIT INT TERM
+      trap "clear_dev_state '$bench_root'" EXIT INT TERM
+    else
+      printf 'keeping benchmark state at %s\n' "$bench_root" >&2
     fi
     if [[ "$saw_proposals" != "true" ]]; then
-      cargo run --quiet --bin athena-bench -- \
+      ATHENA_DB_PATH="$db_path" ATHENA_DOLT_HOME="$dolt_home" \
+        cargo run --quiet --bin athena-bench -- \
         "$subcommand" "$@" --proposals benchmarks/creation/proposals/baseline.json
     else
-      cargo run --quiet --bin athena-bench -- "$subcommand" "$@"
+      ATHENA_DB_PATH="$db_path" ATHENA_DOLT_HOME="$dolt_home" \
+        cargo run --quiet --bin athena-bench -- "$subcommand" "$@"
     fi
     return
   fi
 
-  setup_dev_state
+  setup_dev_state "$bench_root"
   if [[ "$keep_dev_db" != "true" ]]; then
-    trap clear_dev_state EXIT INT TERM
+    trap "clear_dev_state '$bench_root'" EXIT INT TERM
+  else
+    printf 'keeping benchmark state at %s\n' "$bench_root" >&2
   fi
-  cargo run --quiet --bin athena-bench -- "$subcommand" "$@"
+  ATHENA_DB_PATH="$db_path" ATHENA_DOLT_HOME="$dolt_home" \
+    ATHENA_BENCH_ROOT="$bench_root" \
+    cargo run --quiet --bin athena-bench -- "$subcommand" "$@"
 }
 
 command_name="${1:-}"
@@ -88,12 +115,12 @@ shift
 
 case "$command_name" in
   setup)
-    setup_dev_state
+    setup_dev_state "$manual_bench_root"
     ;;
   clear)
-    clear_dev_state
+    clear_dev_state "$bench_parent_root"
     ;;
-  retrieval|creation)
+  retrieval|creation|trajectory)
     run_benchmark "$command_name" "$@"
     ;;
   --help|-h|help)

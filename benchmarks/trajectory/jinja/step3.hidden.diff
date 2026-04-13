@@ -1,0 +1,32 @@
+diff --git a/tests/test_hidden_lru_step3.py b/tests/test_hidden_lru_step3.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_hidden_lru_step3.py
+@@ -0,0 +1,27 @@
++import pytest
++
++from jinja2.utils import LRUCache
++
++
++def test_pop_removes_key_without_disturbing_recency():
++    cache = LRUCache(3)
++    cache["a"] = 1
++    cache["b"] = 2
++    cache["c"] = 3
++
++    assert cache.pop("b") == 2
++    assert cache.keys() == ["c", "a"]
++
++    cache["d"] = 4
++    assert cache.keys() == ["d", "c", "a"]
++
++
++def test_pop_uses_default_or_raises():
++    cache = LRUCache(2)
++    cache["a"] = 1
++
++    assert cache.pop("missing", 42) == 42
++    assert cache.keys() == ["a"]
++
++    with pytest.raises(KeyError):
++        cache.pop("missing")

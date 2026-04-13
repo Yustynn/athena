@@ -1,0 +1,16 @@
+diff --git a/cachelib.py b/cachelib.py
+--- a/cachelib.py
++++ b/cachelib.py
+@@ -26,6 +26,12 @@ class LRUCache:
+     def __len__(self):
+         return len(self._mapping)
+ 
++    def peek(self, key, default=None):
++        if key in self._mapping:
++            return self._mapping[key]
++
++        return default
++
+     def keys(self):
+         keys = list(self._queue)
+         keys.reverse()

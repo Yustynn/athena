@@ -1,0 +1,31 @@
+diff --git a/tests/test_hidden_step3.py b/tests/test_hidden_step3.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_hidden_step3.py
+@@ -0,0 +1,24 @@
++import unittest
++
++from cachelib import LRUCache
++
++
++class HiddenStep3(unittest.TestCase):
++    def test_pop_removes_key_without_disturbing_recency(self):
++        cache = LRUCache(3)
++        cache["a"] = 1
++        cache["b"] = 2
++        cache["c"] = 3
++
++        self.assertEqual(cache.pop("b"), 2)
++        self.assertEqual(cache.keys(), ["c", "a"])
++
++        cache["d"] = 4
++        self.assertEqual(cache.keys(), ["d", "c", "a"])
++
++    def test_pop_uses_default_or_raises(self):
++        cache = LRUCache(2)
++        cache["a"] = 1
++
++        self.assertEqual(cache.pop("missing", 42), 42)
++        self.assertEqual(cache.keys(), ["a"])
++        with self.assertRaises(KeyError):
++            cache.pop("missing")

@@ -21,8 +21,9 @@ Files:
 - tests: `tests/retrieval_benchmark.rs`
 
 Notes:
-- benchmark wrapper initializes isolated dev Athena Dolt state under `.athena/bench-dev`
-- benchmark wrapper clears `.athena/bench-dev` after run unless `--keep-dev-db` is set
+- benchmark wrapper initializes isolated per-run Athena Dolt state under `.athena/bench-dev/<subcommand>.*`
+- benchmark wrapper clears per-run state after run unless `--keep-dev-db` is set
+- when `--keep-dev-db` is set, wrapper prints kept path to stderr for inspection
 - normal benchmark runs must not touch dogfood state in `.athena/db`
 - benchmark calls retrieval code directly
 - benchmark does not exercise full persisted Athena loop
@@ -73,6 +74,36 @@ Current scorer checks:
 - preferred kind match
 - required concept recall
 - forbidden phrase avoidance
+
+See [trajectory-benchmark.md](./trajectory-benchmark.md) for stateful repo-task benchmark plan and tracer-bullet shape.
+
+## Trajectory Benchmark
+
+Purpose:
+- measure whether Codex completes chained repo tasks better with Athena than without it
+- preserve evolving repo state across steps
+- verify each step with hidden oracle tests
+
+Tracer bullet:
+- repo: `pallets/jinja`
+- area: `jinja2.utils.LRUCache`
+- steps: zero-capacity write discard, then `peek`, then `pop`
+
+Entrypoint:
+
+```bash
+scripts/athena-bench trajectory --athena-mode off --keep-workdir
+scripts/athena-bench trajectory --athena-mode current --keep-workdir
+```
+
+Files:
+- plan: `docs/trajectory-benchmark.md`
+- spec: `benchmarks/trajectory/jinja_tracer_bullet.json`
+- prompts and hidden patches: `benchmarks/trajectory/jinja/*`
+- runner: `src/benchmark/trajectory.rs`
+- codex step helper: `scripts/athena-trajectory-codex-step`
+- real-run wrapper: `scripts/run_jinja_trajectory_tracer_bullet.sh`
+- tests: `tests/trajectory_benchmark.rs`
 
 Scorer output includes:
 - per-case `score`

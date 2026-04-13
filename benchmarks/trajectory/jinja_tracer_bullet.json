@@ -1,0 +1,120 @@
+{
+  "name": "jinja_trajectory_tracer_bullet_v1",
+  "sequence_id": "jinja_lru_sequence",
+  "repo": {
+    "repo_id": "pallets_jinja",
+    "source": {
+      "kind": "git",
+      "clone_url": "https://github.com/pallets/jinja.git",
+      "base_rev": "5ef70112a1ff19c05324ff889dd30405b1002044"
+    },
+    "setup_commands": [
+      [
+        "python3",
+        "-m",
+        "venv",
+        ".venv"
+      ],
+      [
+        "./.venv/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "-e",
+        ".",
+        "pytest",
+        "pytest-timeout",
+        "trio"
+      ]
+    ]
+  },
+  "runner": {
+    "command": [
+      "/bin/bash",
+      "../../scripts/athena-trajectory-codex-step"
+    ],
+    "env": {}
+  },
+  "steps": [
+    {
+      "step_id": "step1_zero_capacity",
+      "prompt_path": "jinja/step1.prompt.md",
+      "verifier": {
+        "parser": "pytest",
+        "command": [
+          "env",
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+          "PYTHONPATH=src",
+          "python",
+          "-m",
+          "pytest",
+          "tests/test_utils.py",
+          "tests/test_hidden_lru_step1.py",
+          "-q",
+          "-vv"
+        ],
+        "test_patch_path": "jinja/step1.hidden.diff",
+        "fail_to_pass": [
+          "tests/test_hidden_lru_step1.py::test_zero_capacity_discards_writes"
+        ],
+        "pass_to_pass": [
+          "tests/test_utils.py::TestLRUCache::test_items"
+        ]
+      }
+    },
+    {
+      "step_id": "step2_peek",
+      "prompt_path": "jinja/step2.prompt.md",
+      "verifier": {
+        "parser": "pytest",
+        "command": [
+          "env",
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+          "PYTHONPATH=src",
+          "python",
+          "-m",
+          "pytest",
+          "tests/test_utils.py",
+          "tests/test_hidden_lru_step2.py",
+          "-q",
+          "-vv"
+        ],
+        "test_patch_path": "jinja/step2.hidden.diff",
+        "fail_to_pass": [
+          "tests/test_hidden_lru_step2.py::test_peek_does_not_change_order",
+          "tests/test_hidden_lru_step2.py::test_peek_uses_default_for_missing"
+        ],
+        "pass_to_pass": [
+          "tests/test_utils.py::TestLRUCache::test_items"
+        ]
+      }
+    },
+    {
+      "step_id": "step3_pop",
+      "prompt_path": "jinja/step3.prompt.md",
+      "verifier": {
+        "parser": "pytest",
+        "command": [
+          "env",
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+          "PYTHONPATH=src",
+          "python",
+          "-m",
+          "pytest",
+          "tests/test_utils.py",
+          "tests/test_hidden_lru_step3.py",
+          "-q",
+          "-vv"
+        ],
+        "test_patch_path": "jinja/step3.hidden.diff",
+        "fail_to_pass": [
+          "tests/test_hidden_lru_step3.py::test_pop_removes_key_without_disturbing_recency",
+          "tests/test_hidden_lru_step3.py::test_pop_uses_default_or_raises"
+        ],
+        "pass_to_pass": [
+          "tests/test_utils.py::TestLRUCache::test_items"
+        ]
+      }
+    }
+  ]
+}

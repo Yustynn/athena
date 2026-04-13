@@ -1,0 +1,18 @@
+diff --git a/tests/test_hidden_lru_step1.py b/tests/test_hidden_lru_step1.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_hidden_lru_step1.py
+@@ -0,0 +1,13 @@
++from jinja2.utils import LRUCache
++
++
++def test_zero_capacity_discards_writes():
++    cache = LRUCache(0)
++
++    cache["a"] = 1
++    cache["b"] = 2
++
++    assert len(cache) == 0
++    assert "a" not in cache
++    assert "b" not in cache
++    assert cache.keys() == []
