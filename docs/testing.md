@@ -96,6 +96,13 @@ scripts/athena-bench trajectory --athena-mode off --keep-workdir
 scripts/athena-bench trajectory --athena-mode current --keep-workdir
 ```
 
+Current semantic baseline:
+- mode: real Jinja `off`
+- scope: 3 steps (`zero_capacity`, `peek`, `pop`)
+- result: `3/3` resolved
+- kept artifact: `/Users/yus/Projects/athena-v2/.athena/bench-dev/trajectory.tm1WV0/trajectory-run-1776074378359147000-21244-0`
+- rerun command: `scripts/run_jinja_trajectory_tracer_bullet.sh off`
+
 Files:
 - plan: `docs/trajectory-benchmark.md`
 - spec: `benchmarks/trajectory/jinja_tracer_bullet.json`

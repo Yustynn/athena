@@ -74,6 +74,14 @@ Jinja tracer bullet tasks:
 2. add `peek(key, default=None)` that does not update recency
 3. add `pop(key, default=missing)` that removes entry without disturbing remaining recency
 
+## Current Semantic Baseline
+
+- mode: real Jinja `off`
+- scope: all 3 tracer-bullet steps
+- result: `3/3` resolved
+- kept artifact: `/Users/yus/Projects/athena-v2/.athena/bench-dev/trajectory.tm1WV0/trajectory-run-1776074378359147000-21244-0`
+- rerun command: `scripts/run_jinja_trajectory_tracer_bullet.sh off`
+
 Why this slice:
 - small enough to author now
 - same class across both steps, so later step can benefit from earlier discovery
