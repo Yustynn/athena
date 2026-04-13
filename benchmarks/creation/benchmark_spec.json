@@ -1,0 +1,6 @@
+{
+  "name": "synthetic_creation_v1",
+  "case_files": [
+    "cases/core.json"
+  ]
+}

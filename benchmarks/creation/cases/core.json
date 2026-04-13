@@ -1,0 +1,163 @@
+{
+  "family": "core",
+  "cases": [
+    {
+      "case_id": "cr_01",
+      "family": "core",
+      "difficulty": "easy",
+      "input": {
+        "purpose": {
+          "statement": "Check retrieval benchmark status",
+          "success_criteria": "Summarize current weak spots accurately"
+        },
+        "packet_fragments": [
+          {
+            "fragment_id": "f1",
+            "kind": "procedure",
+            "summary": "Use direct Dolt reads for high-frequency Athena viewer polling.",
+            "full_text": "Use direct Dolt reads for high-frequency Athena viewer polling. Wrapper scripts and CLI flows are fine for operator commands, but viewer refresh paths should read persisted tables directly to avoid extra process overhead and timeout risk."
+          }
+        ],
+        "fragment_feedback": [
+          {
+            "fragment_id": "f1",
+            "verdict": "neutral",
+            "reason": "Not relevant for retrieval benchmark status."
+          }
+        ],
+        "outcome_note": "Run cargo run --quiet --bin athena-bench retrieval for current retrieval benchmark report. generic_noisy is weakest corpus. mc_02 is worst task."
+      },
+      "gold": {
+        "should_create": true,
+        "max_fragments": 1,
+        "preferred_kind": "procedure",
+        "required_concepts": [
+          "retrieval-bench-command",
+          "generic-noisy-weak",
+          "mc-02-weak"
+        ],
+        "forbidden_concepts": [
+          "viewer-polling"
+        ],
+        "concept_aliases": {
+          "retrieval-bench-command": [
+            "athena-bench retrieval",
+            "cargo run --quiet --bin athena-bench retrieval"
+          ],
+          "generic-noisy-weak": [
+            "generic_noisy",
+            "generic noisy",
+            "weakest corpus"
+          ],
+          "mc-02-weak": [
+            "mc_02",
+            "mc-02",
+            "worst task"
+          ],
+          "viewer-polling": [
+            "viewer polling",
+            "high-frequency Athena viewer polling"
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "cr_02",
+      "family": "core",
+      "difficulty": "easy",
+      "input": {
+        "purpose": {
+          "statement": "Fix flaky fixture path test",
+          "success_criteria": "Green test, no behavior change"
+        },
+        "packet_fragments": [
+          {
+            "fragment_id": "f2",
+            "kind": "context",
+            "summary": "Tracer bullet uses fixed fixture fragments.",
+            "full_text": "Tracer bullet uses fixed fixture fragments. Early end-to-end tests rely on deterministic fixture data so packet and feedback behavior can be verified before retrieval and ranking become more sophisticated."
+          }
+        ],
+        "fragment_feedback": [
+          {
+            "fragment_id": "f2",
+            "verdict": "helped",
+            "reason": "Still accurate."
+          }
+        ],
+        "outcome_note": "Adjusted temp path helper. No reusable lesson. No memory change needed."
+      },
+      "gold": {
+        "should_create": false,
+        "max_fragments": 0,
+        "required_concepts": [],
+        "forbidden_concepts": [
+          "temp-path",
+          "one-off-fix"
+        ],
+        "concept_aliases": {
+          "temp-path": [
+            "temp path",
+            "tmp path"
+          ],
+          "one-off-fix": [
+            "fixture path helper",
+            "one-off fix"
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "cr_03",
+      "family": "core",
+      "difficulty": "medium",
+      "input": {
+        "purpose": {
+          "statement": "Start implementation gap audit",
+          "success_criteria": "Use docs before tests"
+        },
+        "packet_fragments": [
+          {
+            "fragment_id": "f3",
+            "kind": "context",
+            "summary": "Canonical design lives in schema and plan docs.",
+            "full_text": "Canonical design lives in schema and plan docs. Use docs as source of truth for design-shape questions."
+          }
+        ],
+        "fragment_feedback": [
+          {
+            "fragment_id": "f3",
+            "verdict": "helped",
+            "reason": "Useful, but follow-up lesson was more specific."
+          }
+        ],
+        "outcome_note": "Future audits should start from docs before tests because tests show behavior but docs define intended design shape."
+      },
+      "gold": {
+        "should_create": true,
+        "max_fragments": 1,
+        "preferred_kind": "context",
+        "required_concepts": [
+          "docs-before-tests",
+          "tests-behavior-not-design"
+        ],
+        "forbidden_concepts": [
+          "generic-canonical-docs"
+        ],
+        "concept_aliases": {
+          "docs-before-tests": [
+            "docs before tests",
+            "start from docs before tests"
+          ],
+          "tests-behavior-not-design": [
+            "tests show behavior",
+            "docs define intended design shape"
+          ],
+          "generic-canonical-docs": [
+            "canonical design lives in schema and plan docs"
+          ]
+        }
+      }
+    }
+  ]
+}

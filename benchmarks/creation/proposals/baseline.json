@@ -1,0 +1,28 @@
+{
+  "proposals": [
+    {
+      "case_id": "cr_01",
+      "proposed_fragments": [
+        {
+          "kind": "procedure",
+          "summary": "Run athena-bench retrieval and inspect generic_noisy first.",
+          "full_text": "Run cargo run --quiet --bin athena-bench retrieval for current retrieval benchmark status. generic_noisy is weakest corpus and mc_02 is worst task in current synthetic suite."
+        }
+      ]
+    },
+    {
+      "case_id": "cr_02",
+      "proposed_fragments": []
+    },
+    {
+      "case_id": "cr_03",
+      "proposed_fragments": [
+        {
+          "kind": "doctrine",
+          "summary": "Canonical docs matter for audits.",
+          "full_text": "Canonical design lives in schema and plan docs. Use docs before tests."
+        }
+      ]
+    }
+  ]
+}
