@@ -3,8 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 db_path="$repo_root/.athena/db"
-fixture_path="$repo_root/.athena/fragments.json"
-dolt_home="$repo_root/.athena/.dolt-home"
+dolt_home="$repo_root/.athena/.dolt-home-db"
 session_path="$repo_root/.athena/session.json"
 
 usage() {
@@ -332,7 +331,7 @@ resolve_packet_id() {
 
 run_persisted_cli() {
   require_command cargo
-  cargo run --quiet --bin athena -- --db "$db_path" --fixture "$fixture_path" "$@"
+  cargo run --quiet --bin athena -- --db "$db_path" "$@"
 }
 
 read_lines_into_array() {

@@ -10,7 +10,6 @@ use std::path::PathBuf;
 
 struct Config {
     db_path: PathBuf,
-    fixture_path: PathBuf,
     command: CommandKind,
 }
 
@@ -35,15 +34,11 @@ fn default_db_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".athena/db")
 }
 
-fn default_fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".athena/fragments.json")
-}
-
 fn usage() -> &'static str {
     "usage:
-  athena [--db path] [--fixture path] purpose create --statement <text> --success-criteria <text>
-  athena [--db path] [--fixture path] purpose update --purpose-id <id> --statement <text> --success-criteria <text>
-  athena [--db path] [--fixture path] feedback apply --purpose-id <id> --packet-id <id> --outcome <success|partial|failed> < feedback.json"
+  athena [--db path] purpose create --statement <text> --success-criteria <text>
+  athena [--db path] purpose update --purpose-id <id> --statement <text> --success-criteria <text>
+  athena [--db path] feedback apply --purpose-id <id> --packet-id <id> --outcome <success|partial|failed> < feedback.json"
 }
 
 fn require_flag(args: &[String], index: &mut usize, flag: &str) -> Result<String, io::Error> {
@@ -69,16 +64,12 @@ fn parse_args() -> Result<Config, io::Error> {
     }
 
     let mut db_path = default_db_path();
-    let mut fixture_path = default_fixture_path();
     let mut index = 0;
 
     while index < args.len() {
         match args[index].as_str() {
             "--db" => {
                 db_path = PathBuf::from(require_flag(&args, &mut index, "--db")?);
-            }
-            "--fixture" => {
-                fixture_path = PathBuf::from(require_flag(&args, &mut index, "--fixture")?);
             }
             "purpose" => {
                 index += 1;
@@ -113,7 +104,6 @@ fn parse_args() -> Result<Config, io::Error> {
                         }
                         Ok(Config {
                             db_path,
-                            fixture_path,
                             command: CommandKind::PurposeCreate {
                                 statement: statement
                                     .ok_or_else(|| io::Error::other("--statement is required"))?,
@@ -158,7 +148,6 @@ fn parse_args() -> Result<Config, io::Error> {
                         }
                         Ok(Config {
                             db_path,
-                            fixture_path,
                             command: CommandKind::PurposeUpdate {
                                 purpose_id: purpose_id
                                     .ok_or_else(|| io::Error::other("--purpose-id is required"))?,
@@ -219,7 +208,6 @@ fn parse_args() -> Result<Config, io::Error> {
                 }
                 return Ok(Config {
                     db_path,
-                    fixture_path,
                     command: CommandKind::FeedbackApply {
                         purpose_id: purpose_id
                             .ok_or_else(|| io::Error::other("--purpose-id is required"))?,
@@ -258,12 +246,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             statement,
             success_criteria,
         } => {
-            let result = create_purpose(
-                &storage,
-                &config.fixture_path,
-                &statement,
-                &success_criteria,
-            )?;
+            let result = create_purpose(&storage, &statement, &success_criteria)?;
             serde_json::to_writer_pretty(io::stdout(), &result)?;
         }
         CommandKind::PurposeUpdate {
@@ -271,13 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             statement,
             success_criteria,
         } => {
-            let result = update_purpose(
-                &storage,
-                &config.fixture_path,
-                &purpose_id,
-                &statement,
-                &success_criteria,
-            )?;
+            let result = update_purpose(&storage, &purpose_id, &statement, &success_criteria)?;
             serde_json::to_writer_pretty(io::stdout(), &result)?;
         }
         CommandKind::FeedbackApply {
@@ -286,14 +263,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             outcome,
         } => {
             let input = read_feedback_input()?;
-            let result = apply_feedback_command(
-                &storage,
-                &config.fixture_path,
-                &purpose_id,
-                &packet_id,
-                outcome,
-                input,
-            )?;
+            let result =
+                apply_feedback_command(&storage, &purpose_id, &packet_id, outcome, input)?;
             serde_json::to_writer_pretty(io::stdout(), &result)?;
         }
     }

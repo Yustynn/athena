@@ -1,4 +1,6 @@
 use serde_json::{Value, json};
+use athena_v2::fragment::load_fragments;
+use athena_v2::storage::DoltStorage;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -14,6 +16,20 @@ fn unique_repo_path() -> PathBuf {
         .unwrap()
         .as_nanos();
     std::env::temp_dir().join(format!("athena-mcp-{nanos}"))
+}
+
+fn seed_fixture_fragments(repo_path: &PathBuf) {
+    let storage = DoltStorage::open(repo_path).unwrap();
+    for fragment in load_fragments(fixture_path()).unwrap() {
+        storage
+            .insert_fragment_node(
+                &fragment.fragment_id,
+                &fragment.kind,
+                &fragment.summary,
+                &fragment.full_text,
+            )
+            .unwrap();
+    }
 }
 
 struct McpSession {
@@ -132,6 +148,7 @@ impl Drop for McpSession {
 #[test]
 fn stable_mcp_exposes_persisted_athena_tools() {
     let repo_path = unique_repo_path();
+    seed_fixture_fragments(&repo_path);
     let mut session = McpSession::new("stable");
 
     let tools = session.request("tools/list", json!({}));
@@ -151,7 +168,6 @@ fn stable_mcp_exposes_persisted_athena_tools() {
             "name": "athena_create_purpose",
             "arguments": {
                 "db_path": repo_path,
-                "fixture_path": fixture_path(),
                 "statement": "Use athena during codex work",
                 "success_criteria": "packet is persisted"
             }

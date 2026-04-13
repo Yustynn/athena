@@ -1,5 +1,5 @@
 use athena_v2::feedback::FeedbackEvent;
-use athena_v2::fragment::{Fragment, FragmentKind};
+use athena_v2::fragment::{Fragment, FragmentKind, load_fragments};
 use athena_v2::ids::FragmentId;
 use athena_v2::packet::PurposePacket;
 use athena_v2::purpose::{Purpose, PurposeStatus};
@@ -61,15 +61,28 @@ fn run_athena(args: &[&str], stdin: Option<&str>) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
+fn seed_fixture_fragments(repo_path: &PathBuf) {
+    let storage = DoltStorage::open(repo_path).unwrap();
+    for fragment in load_fragments(fixture_path()).unwrap() {
+        storage
+            .insert_fragment_node(
+                &fragment.fragment_id,
+                &fragment.kind,
+                &fragment.summary,
+                &fragment.full_text,
+            )
+            .unwrap();
+    }
+}
+
 #[test]
 fn purpose_create_persists_purpose_and_first_packet() {
     let repo_path = unique_repo_path();
+    seed_fixture_fragments(&repo_path);
     let output = run_athena(
         &[
             "--db",
             repo_path.to_str().unwrap(),
-            "--fixture",
-            fixture_path().to_str().unwrap(),
             "purpose",
             "create",
             "--statement",
@@ -101,12 +114,11 @@ fn purpose_create_persists_purpose_and_first_packet() {
 #[test]
 fn purpose_update_persists_updated_purpose_and_new_packet() {
     let repo_path = unique_repo_path();
+    seed_fixture_fragments(&repo_path);
     let create_output = run_athena(
         &[
             "--db",
             repo_path.to_str().unwrap(),
-            "--fixture",
-            fixture_path().to_str().unwrap(),
             "purpose",
             "create",
             "--statement",
@@ -125,8 +137,6 @@ fn purpose_update_persists_updated_purpose_and_new_packet() {
         &[
             "--db",
             repo_path.to_str().unwrap(),
-            "--fixture",
-            fixture_path().to_str().unwrap(),
             "purpose",
             "update",
             "--purpose-id",
@@ -169,12 +179,11 @@ fn purpose_update_persists_updated_purpose_and_new_packet() {
 #[test]
 fn feedback_apply_persists_feedback_new_fragments_and_next_packet() {
     let repo_path = unique_repo_path();
+    seed_fixture_fragments(&repo_path);
     let create_output = run_athena(
         &[
             "--db",
             repo_path.to_str().unwrap(),
-            "--fixture",
-            fixture_path().to_str().unwrap(),
             "purpose",
             "create",
             "--statement",
@@ -220,8 +229,6 @@ fn feedback_apply_persists_feedback_new_fragments_and_next_packet() {
         &[
             "--db",
             repo_path.to_str().unwrap(),
-            "--fixture",
-            fixture_path().to_str().unwrap(),
             "feedback",
             "apply",
             "--purpose-id",

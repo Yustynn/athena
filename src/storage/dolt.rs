@@ -17,10 +17,15 @@ pub struct DoltStorage {
 impl DoltStorage {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, AthenaError> {
         let repo_path = path.as_ref().to_path_buf();
+        let repo_name = repo_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.is_empty())
+            .unwrap_or("repo");
         let home_dir = repo_path
             .parent()
             .unwrap_or(Path::new("."))
-            .join(".dolt-home");
+            .join(format!(".dolt-home-{repo_name}"));
         let storage = Self {
             repo_path,
             home_dir,

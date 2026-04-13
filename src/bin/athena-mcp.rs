@@ -48,11 +48,10 @@ fn stable_tools() -> Vec<Value> {
                 "type": "object",
                 "properties": {
                     "db_path": { "type": "string" },
-                    "fixture_path": { "type": "string" },
                     "statement": { "type": "string" },
                     "success_criteria": { "type": "string" }
                 },
-                "required": ["db_path", "fixture_path", "statement", "success_criteria"]
+                "required": ["db_path", "statement", "success_criteria"]
             }),
         ),
         stable_tool(
@@ -62,12 +61,11 @@ fn stable_tools() -> Vec<Value> {
                 "type": "object",
                 "properties": {
                     "db_path": { "type": "string" },
-                    "fixture_path": { "type": "string" },
                     "purpose_id": { "type": "string" },
                     "statement": { "type": "string" },
                     "success_criteria": { "type": "string" }
                 },
-                "required": ["db_path", "fixture_path", "purpose_id", "statement", "success_criteria"]
+                "required": ["db_path", "purpose_id", "statement", "success_criteria"]
             }),
         ),
         stable_tool(
@@ -77,14 +75,13 @@ fn stable_tools() -> Vec<Value> {
                 "type": "object",
                 "properties": {
                     "db_path": { "type": "string" },
-                    "fixture_path": { "type": "string" },
                     "purpose_id": { "type": "string" },
                     "packet_id": { "type": "string" },
                     "outcome": { "type": "string", "enum": ["success", "partial", "failed"] },
                     "fragment_feedback": { "type": "array" },
                     "new_fragments": { "type": "array" }
                 },
-                "required": ["db_path", "fixture_path", "purpose_id", "packet_id", "outcome", "fragment_feedback"]
+                "required": ["db_path", "purpose_id", "packet_id", "outcome", "fragment_feedback"]
             }),
         ),
     ]
@@ -209,7 +206,6 @@ fn handle_stable_tool(name: &str, arguments: &Value) -> Result<Value, Box<dyn st
             let storage = DoltStorage::open(required_string(arguments, "db_path")?)?;
             let result = create_purpose(
                 &storage,
-                required_string(arguments, "fixture_path")?,
                 &required_string(arguments, "statement")?,
                 &required_string(arguments, "success_criteria")?,
             )?;
@@ -219,7 +215,6 @@ fn handle_stable_tool(name: &str, arguments: &Value) -> Result<Value, Box<dyn st
             let storage = DoltStorage::open(required_string(arguments, "db_path")?)?;
             let result = update_purpose(
                 &storage,
-                required_string(arguments, "fixture_path")?,
                 &PurposeId::new(required_string(arguments, "purpose_id")?),
                 &required_string(arguments, "statement")?,
                 &required_string(arguments, "success_criteria")?,
@@ -244,7 +239,6 @@ fn handle_stable_tool(name: &str, arguments: &Value) -> Result<Value, Box<dyn st
             };
             let result = apply_feedback_command(
                 &storage,
-                required_string(arguments, "fixture_path")?,
                 &PurposeId::new(required_string(arguments, "purpose_id")?),
                 &PacketId::new(required_string(arguments, "packet_id")?),
                 parse_outcome(&required_string(arguments, "outcome")?)?,

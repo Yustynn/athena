@@ -2,13 +2,12 @@ use crate::error::AthenaError;
 use crate::feedback::{
     FeedbackEvent, FragmentFeedback, FragmentScores, TaskOutcome, apply_feedback, validate_feedback,
 };
-use crate::fragment::{Fragment, FragmentKind, load_fragments};
+use crate::fragment::{Fragment, FragmentKind};
 use crate::ids::{FeedbackId, PacketId, PurposeId};
 use crate::packet::{PurposePacket, assemble_packet_with_scores};
 use crate::purpose::{Purpose, PurposeStatus};
 use crate::storage::DoltStorage;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,7 +59,6 @@ impl NewFragmentInput {
 
 pub fn create_purpose(
     storage: &DoltStorage,
-    fixture_path: impl AsRef<Path>,
     statement: &str,
     success_criteria: &str,
 ) -> Result<PurposeCommandResult, AthenaError> {
@@ -71,7 +69,7 @@ pub fn create_purpose(
         status: PurposeStatus::Active,
     };
 
-    let packet = assemble_persisted_packet(storage, fixture_path, &purpose)?;
+    let packet = assemble_persisted_packet(storage, &purpose)?;
     storage.insert_purpose(&purpose)?;
     storage.insert_packet(&packet)?;
     storage.commit_all(&format!("Create Athena purpose {}", purpose.purpose_id))?;
@@ -81,7 +79,6 @@ pub fn create_purpose(
 
 pub fn update_purpose(
     storage: &DoltStorage,
-    fixture_path: impl AsRef<Path>,
     purpose_id: &PurposeId,
     statement: &str,
     success_criteria: &str,
@@ -93,7 +90,7 @@ pub fn update_purpose(
     purpose.success_criteria = success_criteria.to_owned();
     purpose.status = PurposeStatus::Active;
 
-    let packet = assemble_persisted_packet(storage, fixture_path, &purpose)?;
+    let packet = assemble_persisted_packet(storage, &purpose)?;
     storage.insert_purpose(&purpose)?;
     storage.insert_packet(&packet)?;
     storage.commit_all(&format!("Update Athena purpose {}", purpose.purpose_id))?;
@@ -103,7 +100,6 @@ pub fn update_purpose(
 
 pub fn apply_feedback_command(
     storage: &DoltStorage,
-    fixture_path: impl AsRef<Path>,
     purpose_id: &PurposeId,
     packet_id: &PacketId,
     outcome: TaskOutcome,
@@ -145,8 +141,7 @@ pub fn apply_feedback_command(
     let mut fragment_scores = FragmentScores::new();
     apply_feedback(&mut fragment_scores, &feedback);
 
-    let next_packet =
-        assemble_persisted_packet_with_scores(storage, fixture_path, &purpose, &fragment_scores)?;
+    let next_packet = assemble_persisted_packet_with_scores(storage, &purpose, &fragment_scores)?;
 
     storage.insert_feedback(&feedback)?;
     storage.insert_packet(&next_packet)?;
@@ -162,21 +157,17 @@ pub fn apply_feedback_command(
 
 fn assemble_persisted_packet(
     storage: &DoltStorage,
-    fixture_path: impl AsRef<Path>,
     purpose: &Purpose,
 ) -> Result<PurposePacket, AthenaError> {
-    assemble_persisted_packet_with_scores(storage, fixture_path, purpose, &FragmentScores::new())
+    assemble_persisted_packet_with_scores(storage, purpose, &FragmentScores::new())
 }
 
 fn assemble_persisted_packet_with_scores(
     storage: &DoltStorage,
-    fixture_path: impl AsRef<Path>,
     purpose: &Purpose,
     fragment_scores: &FragmentScores,
 ) -> Result<PurposePacket, AthenaError> {
-    let mut fragments = load_fragments(fixture_path)?;
-    fragments.extend(storage.list_fragment_nodes()?);
-
+    let fragments = storage.list_fragment_nodes()?;
     let mut packet = assemble_packet_with_scores(purpose, &fragments, fragment_scores)?;
     packet.packet_id = PacketId::new(unique_id("packet"));
     Ok(packet)
