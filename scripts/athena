@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-db_path="$repo_root/.athena/db"
-dolt_home="$repo_root/.athena/.dolt-home-db"
+db_path="${ATHENA_DB_PATH:-$repo_root/.athena/db}"
+dolt_home="${ATHENA_DOLT_HOME:-$repo_root/.athena/.dolt-home-db}"
 session_path="$repo_root/.athena/session.json"
 
 usage() {
@@ -529,8 +529,8 @@ puts "- `#{testing_doc}`"
 
 puts
 puts "## Benchmarks"
-puts "- retrieval: `cargo run --quiet --bin athena-bench retrieval`"
-puts "- creation: `cargo run --quiet --bin athena-bench creation --proposals benchmarks/creation/proposals/baseline.json`"
+puts "- retrieval: `scripts/athena-bench retrieval`"
+puts "- creation: `scripts/athena-bench creation`"
 RUBY
 }
 

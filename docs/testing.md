@@ -10,7 +10,7 @@ Purpose:
 Entrypoint:
 
 ```bash
-cargo run --quiet --bin athena-bench retrieval
+scripts/athena-bench retrieval
 ```
 
 Files:
@@ -21,6 +21,9 @@ Files:
 - tests: `tests/retrieval_benchmark.rs`
 
 Notes:
+- benchmark wrapper initializes isolated dev Athena Dolt state under `.athena/bench-dev`
+- benchmark wrapper clears `.athena/bench-dev` after run unless `--keep-dev-db` is set
+- normal benchmark runs must not touch dogfood state in `.athena/db`
 - benchmark calls retrieval code directly
 - benchmark does not exercise full persisted Athena loop
 - use it for ranking, trigger, supersession, and corpus-quality regressions
@@ -34,7 +37,7 @@ Purpose:
 Entrypoint:
 
 ```bash
-cargo run --quiet --bin athena-bench creation --proposals benchmarks/creation/proposals/baseline.json
+scripts/athena-bench creation
 ```
 
 Files:
@@ -115,6 +118,13 @@ Targeted benchmark tests:
 ```bash
 cargo test retrieval_benchmark -- --nocapture
 cargo test creation_benchmark -- --nocapture
+```
+
+Manual benchmark state helpers:
+
+```bash
+scripts/athena-bench setup
+scripts/athena-bench clear
 ```
 
 Session-close Athena checks:

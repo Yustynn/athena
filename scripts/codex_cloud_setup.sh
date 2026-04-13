@@ -18,4 +18,4 @@ fi
 
 bd version
 
-chmod +x scripts/athena scripts/athena-dev scripts/athena_check.sh
+chmod +x scripts/athena scripts/athena-bench scripts/athena-dev scripts/athena_check.sh

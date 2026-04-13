@@ -99,8 +99,10 @@ HOME="$PWD/.athena/.dolt-home" dolt sql -q "select purpose_id, statement, succes
 Benchmark quick reference:
 
 ```bash
-cargo run --quiet --bin athena-bench retrieval
-cargo run --quiet --bin athena-bench creation --proposals benchmarks/creation/proposals/baseline.json
+scripts/athena-bench retrieval
+scripts/athena-bench creation
 ```
+
+Benchmark wrapper uses isolated dev Athena state under `.athena/bench-dev` and clears it after each run, so dogfood `.athena/db` stays untouched.
 
 See `docs/testing.md` for benchmark fixture layout, proposal format, and verification commands.

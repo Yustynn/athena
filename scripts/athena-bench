@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+bench_root="$repo_root/.athena/bench-dev"
+db_path="$bench_root/db"
+dolt_home="$bench_root/.dolt-home-db"
+
+usage() {
+  cat <<'EOF'
+usage:
+  scripts/athena-bench setup
+  scripts/athena-bench clear
+  scripts/athena-bench retrieval [--spec path] [--keep-dev-db]
+  scripts/athena-bench creation [--spec path] [--proposals path] [--keep-dev-db]
+
+defaults:
+  creation proposals path: benchmarks/creation/proposals/baseline.json
+
+notes:
+  Initializes isolated dev Athena Dolt state under .athena/bench-dev.
+  Clears that dev state after benchmark run unless --keep-dev-db is set.
+  Does not touch tracked dogfood state in .athena/db.
+EOF
+}
+
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+clear_dev_state() {
+  rm -rf "$bench_root"
+}
+
+setup_dev_state() {
+  clear_dev_state
+  mkdir -p "$bench_root"
+  ATHENA_DB_PATH="$db_path" ATHENA_DOLT_HOME="$dolt_home" \
+    "$repo_root/scripts/athena" latest-state >/dev/null
+}
+
+run_benchmark() {
+  local subcommand="$1"
+  shift
+
+  local keep_dev_db="false"
+  if [[ "${1:-}" == "--keep-dev-db" ]]; then
+    keep_dev_db="true"
+    shift
+  fi
+
+  if [[ "$subcommand" == "creation" ]]; then
+    local saw_proposals="false"
+    local arg
+    for arg in "$@"; do
+      if [[ "$arg" == "--proposals" ]]; then
+        saw_proposals="true"
+        break
+      fi
+    done
+    setup_dev_state
+    if [[ "$keep_dev_db" != "true" ]]; then
+      trap clear_dev_state EXIT INT TERM
+    fi
+    if [[ "$saw_proposals" != "true" ]]; then
+      cargo run --quiet --bin athena-bench -- \
+        "$subcommand" "$@" --proposals benchmarks/creation/proposals/baseline.json
+    else
+      cargo run --quiet --bin athena-bench -- "$subcommand" "$@"
+    fi
+    return
+  fi
+
+  setup_dev_state
+  if [[ "$keep_dev_db" != "true" ]]; then
+    trap clear_dev_state EXIT INT TERM
+  fi
+  cargo run --quiet --bin athena-bench -- "$subcommand" "$@"
+}
+
+command_name="${1:-}"
+if [[ -z "$command_name" ]]; then
+  usage
+  exit 1
+fi
+shift
+
+case "$command_name" in
+  setup)
+    setup_dev_state
+    ;;
+  clear)
+    clear_dev_state
+    ;;
+  retrieval|creation)
+    run_benchmark "$command_name" "$@"
+    ;;
+  --help|-h|help)
+    usage
+    ;;
+  *)
+    die "unknown command: $command_name"
+    ;;
+esac
