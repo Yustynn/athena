@@ -165,6 +165,9 @@ pub fn run_trajectory_benchmark(
     if !repo_dir.join(".git").exists() {
         initialize_git_repo(&repo_dir)?;
     }
+    if athena_mode == "current" {
+        install_athena_session_start_hook(&repo_dir)?;
+    }
     for command in &spec.repo.setup_commands {
         run_command_checked(command, &repo_dir, None)?;
     }
@@ -423,6 +426,36 @@ fn initialize_git_repo(repo_dir: &Path) -> Result<(), AthenaError> {
         None,
     )?;
     Ok(())
+}
+
+fn install_athena_session_start_hook(repo_dir: &Path) -> Result<(), AthenaError> {
+    let hook_dir = repo_dir.join(".codex").join("hooks");
+    fs::create_dir_all(&hook_dir)?;
+
+    let hook_script_path = hook_dir.join("session_start_athena_prime.sh");
+    let source_repo_root = shell_single_quote(&env!("CARGO_MANIFEST_DIR"))?;
+    let hook_script = format!(
+        "#!/usr/bin/env bash\n\
+set -euo pipefail\n\n\
+source_repo_root={source_repo_root}\n\
+prime_output=\"$(\"$source_repo_root/scripts/athena\" prime)\"\n\
+escaped_output=\"$(printf '%s' \"$prime_output\" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))')\"\n\n\
+printf '{{'\n\
+printf '\"hookSpecificOutput\":{{\"hookEventName\":\"SessionStart\",\"additionalContext\":%s}}' \"$escaped_output\"\n\
+printf '}}\\n'\n"
+    );
+    fs::write(&hook_script_path, hook_script)?;
+
+    let hooks_json = "{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"matcher\": \"startup|resume\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"bash \\\"$(git rev-parse --show-toplevel)/.codex/hooks/session_start_athena_prime.sh\\\"\",\n            \"statusMessage\": \"Loading Athena workflow context\"\n          }\n        ]\n      }\n    ]\n  }\n}\n";
+    fs::write(repo_dir.join(".codex").join("hooks.json"), hooks_json)?;
+    Ok(())
+}
+
+fn shell_single_quote(value: &str) -> Result<String, AthenaError> {
+    if value.contains('\0') {
+        return Err(std::io::Error::other("shell value cannot contain NUL").into());
+    }
+    Ok(format!("'{}'", value.replace('\'', "'\"'\"'")))
 }
 
 fn benchmark_env(

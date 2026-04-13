@@ -104,9 +104,12 @@ benchmarks/trajectory/
 
 Runner contract:
 - benchmark runner sets env vars with repo path, prompt path, message file, and Athena mode
+- in `current` mode, benchmark runner writes repo-local `.codex/hooks.json` and session-start hook into cloned repo before runner starts
+- generated hook emits `scripts/athena prime` output from athena-v2 host repo as SessionStart additional context
 - external runner command mutates repo in place
 - Codex helper script lives at `scripts/athena-trajectory-codex-step`
 - helper runs `codex exec --json` so runner stdout is raw JSONL event log
+- helper still appends explicit Athena `ensure-purpose` guidance in `current` mode
 
 Telemetry sources:
 - `codex_event_log`: parsed from Codex JSONL events on runner stdout

@@ -1,4 +1,5 @@
 use athena_v2::benchmark::{TrajectoryDataSource, run_trajectory_benchmark};
+use std::fs;
 use std::path::PathBuf;
 
 fn benchmark_spec_path() -> PathBuf {
@@ -68,4 +69,27 @@ fn trajectory_benchmark_preserves_pass_to_pass_checks_between_steps() {
         .observed_read_files
         .iter()
         .any(|item| item.path == "cachelib.py"));
+}
+
+#[test]
+fn trajectory_benchmark_current_mode_writes_athena_session_start_hook() {
+    let report = run_trajectory_benchmark(benchmark_spec_path(), "current", true).unwrap();
+    let run_root = PathBuf::from(report.kept_run_root.as_ref().unwrap());
+    let repo_dir = run_root.join("repo");
+    let hooks_json_path = repo_dir.join(".codex/hooks.json");
+    let hook_script_path = repo_dir.join(".codex/hooks/session_start_athena_prime.sh");
+
+    let hooks_json = fs::read_to_string(&hooks_json_path).unwrap();
+    assert!(hooks_json.contains("\"SessionStart\""));
+    assert!(hooks_json.contains("session_start_athena_prime.sh"));
+
+    let hook_script = fs::read_to_string(&hook_script_path).unwrap();
+    assert!(hook_script.contains("hookEventName\":\"SessionStart"));
+    assert!(hook_script.contains(&format!(
+        "source_repo_root='{}'",
+        env!("CARGO_MANIFEST_DIR")
+    )));
+    assert!(hook_script.contains("\"$source_repo_root/scripts/athena\" prime"));
+
+    fs::remove_dir_all(run_root).unwrap();
 }

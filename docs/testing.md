@@ -112,6 +112,11 @@ Files:
 - real-run wrapper: `scripts/run_jinja_trajectory_tracer_bullet.sh`
 - tests: `tests/trajectory_benchmark.rs`
 
+Current-mode Athena wiring:
+- benchmark writes repo-local `.codex/hooks.json` plus session-start hook into cloned run repo before runner starts
+- hook injects `scripts/athena prime` output from athena-v2 host repo
+- codex step helper still appends explicit Athena `ensure-purpose` guidance to prompt
+
 Per-step telemetry:
 - `usage`: token counts from Codex JSON events when available
 - `tool_counts`: completed Codex event item types with counts
