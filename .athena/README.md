@@ -2,11 +2,48 @@ Athena local Dolt state
 
 - `db/`: tracked Dolt repository for Athena persisted memory
 - `fragments.json`: tracked base fragments Athena assembles into packets
+- `session.json`: untracked wrapper-managed current purpose/packet ids
 - `.dolt-home/`: untracked Dolt CLI home used for local command state and telemetry files
-- stable Codex MCP server: persisted tools backed by `.athena/db`
-- dev Codex MCP server: stateless experimentation tools
+- `scripts/athena`: persisted wrapper backed by `.athena/db`
+- `scripts/athena-dev`: stateless experimentation wrapper
 
-Start Athena loop:
+Prime current Athena context:
+
+```bash
+scripts/athena prime
+```
+
+Notes:
+- run `scripts/athena prime` after new session, compaction, or `scripts/athena clear-session`
+- create `.athena/PRIME.md` to override default prime output
+- run `scripts/athena prime --export` to print built-in output even when override exists
+- default prime output is workflow context only; inspect state separately with `scripts/athena current` or `scripts/athena latest-state`
+
+Recommended Codex loop:
+
+```bash
+scripts/athena ensure-purpose "..." "..."
+```
+
+```bash
+scripts/athena feedback partial feedback.json
+```
+
+Stateless dev loop:
+
+```bash
+scripts/athena-dev packet "..." "..."
+```
+
+```bash
+scripts/athena-dev check-orientation request.json
+```
+
+```bash
+scripts/athena-dev apply-feedback request.json
+```
+
+Low-level fallback:
 
 ```bash
 cargo run --quiet --bin athena -- purpose create \
@@ -58,3 +95,12 @@ Inspect persisted purposes:
 ```bash
 HOME="$PWD/.athena/.dolt-home" dolt sql -q "select purpose_id, statement, success_criteria, status from purposes order by purpose_id desc;" -r json
 ```
+
+Benchmark quick reference:
+
+```bash
+cargo run --quiet --bin athena-bench retrieval
+cargo run --quiet --bin athena-bench creation --proposals benchmarks/creation/proposals/baseline.json
+```
+
+See `docs/testing.md` for benchmark fixture layout, proposal format, and verification commands.

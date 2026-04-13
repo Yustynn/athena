@@ -9,6 +9,7 @@ session_path="$repo_root/.athena/session.json"
 usage() {
   cat <<'EOF'
 usage:
+  scripts/athena prime [--export]
   scripts/athena latest-state
   scripts/athena current
   scripts/athena use-latest
@@ -500,6 +501,51 @@ read_input_path() {
   fi
 }
 
+prime_markdown() {
+  local testing_doc="docs/testing.md"
+  local athena_readme=".athena/README.md"
+
+  TESTING_DOC="$testing_doc" ATHENA_README="$athena_readme" ruby <<'RUBY'
+testing_doc = ENV.fetch("TESTING_DOC")
+athena_readme = ENV.fetch("ATHENA_README")
+
+puts "# Athena Workflow Context"
+puts
+puts "> **Context Recovery**: Run `scripts/athena prime` after compaction, clear, or new session"
+puts "> Override default output with `.athena/PRIME.md`, or use `scripts/athena prime --export` to print built-in output"
+puts
+puts "## Core Commands"
+puts "- `scripts/athena prime`"
+puts "- `scripts/athena ensure-purpose \"...\" \"...\"`"
+puts "- `scripts/athena current`"
+puts "- `scripts/athena use-latest`"
+puts "- `scripts/athena feedback partial feedback.json`"
+puts "- `scripts/athena clear-session`"
+
+puts
+puts "## Docs"
+puts "- `#{athena_readme}`"
+puts "- `#{testing_doc}`"
+
+puts
+puts "## Benchmarks"
+puts "- retrieval: `cargo run --quiet --bin athena-bench retrieval`"
+puts "- creation: `cargo run --quiet --bin athena-bench creation --proposals benchmarks/creation/proposals/baseline.json`"
+RUBY
+}
+
+emit_prime() {
+  local export_default="${1:-false}"
+  local override_path="$repo_root/.athena/PRIME.md"
+
+  if [[ "$export_default" != "true" && -f "$override_path" ]]; then
+    cat "$override_path"
+    return
+  fi
+
+  prime_markdown
+}
+
 command_name="${1:-}"
 if [[ -z "$command_name" ]]; then
   usage
@@ -508,6 +554,25 @@ fi
 shift
 
 case "$command_name" in
+  prime)
+    export_default="false"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --export)
+          export_default="true"
+          shift
+          ;;
+        --help|-h)
+          usage
+          exit 0
+          ;;
+        *)
+          die "unexpected argument: $1"
+          ;;
+      esac
+    done
+    emit_prime "$export_default"
+    ;;
   latest-state)
     latest_state_json
     ;;
