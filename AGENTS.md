@@ -27,7 +27,6 @@ Use repo bash wrappers. Do not use Athena MCP for normal Codex work.
 Persisted wrapper:
 
 ```bash
-scripts/athena latest-state
 scripts/athena ensure-purpose "..." "..."
 scripts/athena update "..." "..."
 scripts/athena feedback partial feedback.json
@@ -51,10 +50,10 @@ Default:
 - use `scripts/athena-dev` only for experimental stateless packet/orientation calls
 
 Usage rules:
-- at start of substantive work, call `scripts/athena latest-state` first
-- if no active purpose fits, call `scripts/athena ensure-purpose "..." "..."`
+- at start of substantive work, state purpose with `scripts/athena ensure-purpose "..." "..."`
+- treat Athena as purpose-first, not latest-state-first
 - if scope or done condition changes materially, update purpose before continuing
-- after verification or learning, apply Athena feedback for packet used during work
+- at end of substantive work, after verification or learning, apply Athena feedback for packet used during work
 - prefer wrapper defaults over manual purpose/packet id copying; wrappers reuse `.athena/session.json`
 - only write `new_fragments` for durable reusable knowledge, not transient task chatter
 - durable reusable knowledge includes implementation lessons, not only product doctrine
