@@ -37,7 +37,7 @@ code {
 .shell {
   margin: 0 auto;
   max-width: 1500px;
-  padding: 0.5rem;
+  padding: 0.6rem;
 }
 
 .toolbar {
@@ -92,6 +92,12 @@ code {
   display: grid;
   gap: 0.5rem;
   align-content: start;
+}
+
+.panel-stack {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .panel {
@@ -166,6 +172,7 @@ code {
   font-size: 0.64rem;
   color: rgba(236, 231, 223, 0.46);
   font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  overflow-wrap: anywhere;
 }
 
 .kv-table {
@@ -193,12 +200,15 @@ code {
   margin: 0;
   text-align: right;
   color: rgba(255, 255, 255, 0.88);
+  overflow-wrap: anywhere;
 }
 
 .list-panel,
 .feedback-list,
 .score-list,
-.step-list {
+.step-list,
+.timeline-list,
+.packet-summary-grid {
   display: grid;
   gap: 0.35rem;
   margin-top: 0.5rem;
@@ -208,7 +218,8 @@ code {
 .feedback-row,
 .history-row,
 .empty-row,
-.step-row {
+.step-row,
+.timeline-row {
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 0.8rem;
   background: rgba(255, 255, 255, 0.03);
@@ -241,10 +252,54 @@ code {
   color: rgba(236, 231, 223, 0.72);
 }
 
-.step-row.is-active {
+.step-row.is-active,
+.timeline-row.is-active {
   border-color: rgba(144, 241, 255, 0.24);
   background: rgba(144, 241, 255, 0.08);
   color: rgba(144, 241, 255, 0.96);
+}
+
+.timeline-row {
+  display: grid;
+  gap: 0.28rem;
+  width: 100%;
+  padding: 0.5rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.timeline-row:hover {
+  border-color: rgba(144, 241, 255, 0.18);
+  background: rgba(144, 241, 255, 0.04);
+}
+
+.timeline-top,
+.feedback-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.timeline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(236, 231, 223, 0.5);
+}
+
+.timeline-index {
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(144, 241, 255, 0.84);
+}
+
+.packet-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .fragment-list {
@@ -265,7 +320,7 @@ code {
 
 .fragment-row {
   display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr) 5.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(11rem, 13rem);
   gap: 0.55rem;
   align-items: start;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -281,9 +336,11 @@ code {
 }
 
 .fragment-meta {
-  display: grid;
-  gap: 0.28rem;
-  align-content: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.4rem;
+  grid-column: 1 / -1;
+  align-items: center;
 }
 
 .score-chip {
@@ -315,6 +372,7 @@ code {
   font-size: 0.66rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+  overflow-wrap: anywhere;
 }
 
 .fragment-id {
@@ -331,6 +389,7 @@ code {
   font-size: 0.8rem;
   line-height: 1.25;
   color: white;
+  overflow-wrap: anywhere;
 }
 
 .fragment-content p {
@@ -338,6 +397,7 @@ code {
   font-size: 0.7rem;
   line-height: 1.35;
   color: rgba(236, 231, 223, 0.72);
+  overflow-wrap: anywhere;
 }
 
 .fragment-feedback {
@@ -352,6 +412,7 @@ code {
   line-height: 1.3;
   color: rgba(236, 231, 223, 0.62);
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .feedback-row {
@@ -387,6 +448,10 @@ code {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(236, 231, 223, 0.46);
+}
+
+.history-meta span {
+  overflow-wrap: anywhere;
 }
 
 .history-row p {
@@ -459,6 +524,7 @@ code {
   font-size: 0.72rem;
   line-height: 1.4;
   color: rgba(236, 231, 223, 0.78);
+  overflow-wrap: anywhere;
 }
 
 .error-copy {
@@ -468,15 +534,33 @@ code {
   color: rgba(255, 213, 128, 0.9);
 }
 
-@media (min-width: 1080px) {
+@media (min-width: 1320px) {
   .dashboard-grid {
     grid-template-columns: 15rem minmax(0, 1fr) 15rem;
   }
 }
 
-@media (max-width: 1079px) {
+@media (max-width: 1319px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .packet-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fragment-row {
+    grid-template-columns: 1fr;
+  }
+
+  .fragment-feedback {
+    justify-items: start;
+  }
+
+  .fragment-feedback p {
+    text-align: left;
   }
 }
 
@@ -493,17 +577,5 @@ code {
 
   .dense-meta {
     display: none;
-  }
-
-  .fragment-row {
-    grid-template-columns: 1fr;
-  }
-
-  .fragment-feedback {
-    justify-items: start;
-  }
-
-  .fragment-feedback p {
-    text-align: left;
   }
 }
