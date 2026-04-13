@@ -18,6 +18,7 @@ Notes:
 - create `.athena/PRIME.md` to override default prime output
 - run `scripts/athena prime --export` to print built-in output even when override exists
 - default prime output is workflow context only; inspect state separately with `scripts/athena current` or `scripts/athena latest-state`
+- repo-local Codex SessionStart hook now injects `scripts/athena prime` from `.codex/hooks.json` when `codex_hooks` is enabled
 
 Recommended Codex loop:
 
