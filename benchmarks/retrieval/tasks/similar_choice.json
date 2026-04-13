@@ -1,0 +1,53 @@
+{
+  "family": "similar_choice",
+  "tasks": [
+    {
+      "task_id": "sc_01",
+      "family": "similar_choice",
+      "difficulty": "hard",
+      "corpus_id": "ambiguous_similar",
+      "prompt": "Choose retrieval path for high-frequency viewer polling",
+      "success_criteria": "Prefer direct read path over cache layer for this task",
+      "gold": {
+        "required_matches": ["as_001"],
+        "preferred_order": ["as_001", "as_002"]
+      }
+    },
+    {
+      "task_id": "sc_02",
+      "family": "similar_choice",
+      "difficulty": "hard",
+      "corpus_id": "ambiguous_similar",
+      "prompt": "Decide what Athena viewer should separate",
+      "success_criteria": "Show current packet separately from total memory, not just dense UI",
+      "gold": {
+        "required_matches": ["as_003"],
+        "preferred_order": ["as_003", "as_004"]
+      }
+    },
+    {
+      "task_id": "sc_03",
+      "family": "similar_choice",
+      "difficulty": "hard",
+      "corpus_id": "ambiguous_similar",
+      "prompt": "Start implementation gap audit",
+      "success_criteria": "Use docs before tests",
+      "gold": {
+        "required_matches": ["as_006", "as_005"],
+        "preferred_order": ["as_006", "as_005"]
+      }
+    },
+    {
+      "task_id": "sc_04",
+      "family": "similar_choice",
+      "difficulty": "hard",
+      "corpus_id": "ambiguous_similar",
+      "prompt": "Feedback policy before edits",
+      "success_criteria": "Require exhaustive fragment feedback, not generic review notes",
+      "gold": {
+        "required_matches": ["as_007"],
+        "preferred_order": ["as_007", "as_008"]
+      }
+    }
+  ]
+}

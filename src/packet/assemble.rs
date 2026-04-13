@@ -12,11 +12,15 @@ pub fn assemble_packet(
     assemble_packet_with_scores(purpose, fragments, &BTreeMap::new())
 }
 
-pub fn assemble_packet_with_scores(
+pub fn rank_fragments(purpose: &Purpose, fragments: &[Fragment]) -> Vec<Fragment> {
+    rank_fragments_with_scores(purpose, fragments, &BTreeMap::new())
+}
+
+pub fn rank_fragments_with_scores(
     purpose: &Purpose,
     fragments: &[Fragment],
     fragment_scores: &BTreeMap<String, i32>,
-) -> Result<PurposePacket, AthenaError> {
+) -> Vec<Fragment> {
     let input = format!("{} {}", purpose.statement, purpose.success_criteria).to_lowercase();
     let superseded_ids = active_superseded_ids(fragments);
 
@@ -37,10 +41,6 @@ pub fn assemble_packet_with_scores(
     let mut concept_keys = BTreeSet::new();
 
     for (_, _, fragment) in ranked {
-        if selected.len() >= 3 {
-            break;
-        }
-
         if let Some(key) = fragment.concept_key.as_ref() {
             if !concept_keys.insert(key.to_lowercase()) {
                 continue;
@@ -49,6 +49,19 @@ pub fn assemble_packet_with_scores(
 
         selected.push(fragment.clone());
     }
+
+    selected
+}
+
+pub fn assemble_packet_with_scores(
+    purpose: &Purpose,
+    fragments: &[Fragment],
+    fragment_scores: &BTreeMap<String, i32>,
+) -> Result<PurposePacket, AthenaError> {
+    let selected = rank_fragments_with_scores(purpose, fragments, fragment_scores)
+        .into_iter()
+        .take(3)
+        .collect::<Vec<_>>();
 
     if selected.is_empty() {
         return Err(AthenaError::EmptyPacket);

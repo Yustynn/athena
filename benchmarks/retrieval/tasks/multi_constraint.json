@@ -1,0 +1,49 @@
+{
+  "family": "multi_constraint",
+  "tasks": [
+    {
+      "task_id": "mc_01",
+      "family": "multi_constraint",
+      "difficulty": "medium",
+      "corpus_id": "metadata_rich",
+      "prompt": "Collect feedback before editing code",
+      "success_criteria": "Validate packet before commit and keep open questions visible",
+      "gold": {
+        "required_matches": ["mr_002", "mr_003", "mr_011"]
+      }
+    },
+    {
+      "task_id": "mc_02",
+      "family": "multi_constraint",
+      "difficulty": "medium",
+      "corpus_id": "generic_noisy",
+      "prompt": "Refresh Athena viewer repeatedly",
+      "success_criteria": "Use fast reads, clear states, and explicit stop rules for long work",
+      "gold": {
+        "required_matches": ["gn_005", "gn_006", "gn_012"]
+      }
+    },
+    {
+      "task_id": "mc_03",
+      "family": "multi_constraint",
+      "difficulty": "medium",
+      "corpus_id": "metadata_rich",
+      "prompt": "Benchmark long run for storage polling",
+      "success_criteria": "Stop early on misalignment and surface open questions",
+      "gold": {
+        "required_matches": ["mr_004", "mr_010", "mr_011"]
+      }
+    },
+    {
+      "task_id": "mc_04",
+      "family": "multi_constraint",
+      "difficulty": "hard",
+      "corpus_id": "metadata_rich",
+      "prompt": "Investigate weak retrieval quality",
+      "success_criteria": "Use canonical docs and diagnose whether corpus quality masks selector quality",
+      "gold": {
+        "required_matches": ["mr_008", "mr_012"]
+      }
+    }
+  ]
+}

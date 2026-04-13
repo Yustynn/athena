@@ -1,0 +1,113 @@
+{
+  "corpus_id": "metadata_rich",
+  "fragments": [
+    {
+      "fragment_id": "mr_001",
+      "kind": "doctrine",
+      "summary": "Keep runtime deterministic.",
+      "full_text": "Keep runtime deterministic. Stable ranking and retrieval outputs help debugging and trust.",
+      "trigger_conditions": ["deterministic", "stable outputs"],
+      "concept_key": "determinism",
+      "usefulness_score": 2
+    },
+    {
+      "fragment_id": "mr_002",
+      "kind": "pitfall",
+      "summary": "Require exhaustive fragment feedback before edits.",
+      "full_text": "Require exhaustive fragment feedback before edits. Retrieval changes should keep fragment-level verdict coverage explicit.",
+      "trigger_conditions": ["feedback", "fragment feedback", "edits", "editing"],
+      "concept_key": "feedback-discipline",
+      "usefulness_score": 4
+    },
+    {
+      "fragment_id": "mr_003",
+      "kind": "procedure",
+      "summary": "Validate packet before commit.",
+      "full_text": "Validate packet before commit. Check selected fragments and state before finishing work.",
+      "trigger_conditions": ["validate", "commit", "before commit"],
+      "concept_key": "validation",
+      "usefulness_score": 4
+    },
+    {
+      "fragment_id": "mr_004",
+      "kind": "procedure",
+      "summary": "Use direct Dolt reads for high-frequency polling.",
+      "full_text": "Use direct Dolt reads for high-frequency polling. Retrieval paths that repeat rapidly should avoid extra wrapper overhead.",
+      "trigger_conditions": ["polling", "viewer", "dolt", "high-frequency", "storage"],
+      "concept_key": "viewer-read",
+      "usefulness_score": 5
+    },
+    {
+      "fragment_id": "mr_005",
+      "kind": "procedure",
+      "summary": "Serve cached snapshot from middleware.",
+      "full_text": "Serve cached snapshot from middleware. Some read paths should use cached last-known-good state to stay responsive.",
+      "trigger_conditions": ["cache", "cached", "snapshot", "middleware", "refresh"],
+      "concept_key": "viewer-cache",
+      "usefulness_score": 3
+    },
+    {
+      "fragment_id": "mr_006",
+      "kind": "doctrine",
+      "summary": "Expose live, stale, and error states explicitly.",
+      "full_text": "Expose live, stale, and error states explicitly. Operators need to know freshness before trusting retrieval output.",
+      "trigger_conditions": ["live", "stale", "error", "freshness", "fresh"],
+      "concept_key": "freshness-state",
+      "usefulness_score": 4
+    },
+    {
+      "fragment_id": "mr_007",
+      "kind": "doctrine",
+      "summary": "Separate current packet from full fragment store.",
+      "full_text": "Separate current packet from full fragment store. Packet context and total memory answer different questions.",
+      "trigger_conditions": ["packet", "full fragment store", "store", "current packet"],
+      "concept_key": "view-separation",
+      "usefulness_score": 4
+    },
+    {
+      "fragment_id": "mr_008",
+      "kind": "context",
+      "summary": "Canonical design lives in schema and plan docs.",
+      "full_text": "Canonical design lives in schema and plan docs. Use docs as source of truth for design-shape questions.",
+      "trigger_conditions": ["design spec", "schema", "plan", "docs", "canonical"],
+      "concept_key": "docs-canonical",
+      "usefulness_score": 4
+    },
+    {
+      "fragment_id": "mr_009",
+      "kind": "context",
+      "summary": "Start gap audits from docs before tests.",
+      "full_text": "Start gap audits from docs before tests. Tests show behavior, but docs define intended design shape.",
+      "trigger_conditions": ["audit", "implementation", "tests", "gap", "docs"],
+      "concept_key": "audit-start",
+      "usefulness_score": 4
+    },
+    {
+      "fragment_id": "mr_010",
+      "kind": "procedure",
+      "summary": "Stop before long benchmark if orientation is unresolved.",
+      "full_text": "Stop before long benchmark if orientation is unresolved. Long expensive work needs an explicit go/no-go check.",
+      "trigger_conditions": ["benchmark", "long run", "misalignment", "stop early", "orientation"],
+      "concept_key": "benchmark-stop",
+      "usefulness_score": 5
+    },
+    {
+      "fragment_id": "mr_011",
+      "kind": "context",
+      "summary": "Surface open questions before action.",
+      "full_text": "Surface open questions before action. Unresolved questions should remain visible when work could drift.",
+      "trigger_conditions": ["open questions", "unresolved", "uncertainties"],
+      "concept_key": "open-questions",
+      "usefulness_score": 4
+    },
+    {
+      "fragment_id": "mr_012",
+      "kind": "context",
+      "summary": "Weak corpus quality can mask selector quality.",
+      "full_text": "Weak corpus quality can mask selector quality. Retrieval failures sometimes come from inventory quality, not only ranking logic.",
+      "trigger_conditions": ["corpus", "inventory", "memory quality", "selector", "retrieval quality"],
+      "concept_key": "corpus-diagnosis",
+      "usefulness_score": 4
+    }
+  ]
+}

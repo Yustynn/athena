@@ -1,0 +1,49 @@
+{
+  "family": "direct_trigger",
+  "tasks": [
+    {
+      "task_id": "dt_01",
+      "family": "direct_trigger",
+      "difficulty": "easy",
+      "corpus_id": "generic_noisy",
+      "prompt": "Collect feedback before editing code",
+      "success_criteria": "Keep feedback discipline explicit before edits",
+      "gold": {
+        "required_matches": ["gn_002"]
+      }
+    },
+    {
+      "task_id": "dt_02",
+      "family": "direct_trigger",
+      "difficulty": "easy",
+      "corpus_id": "metadata_rich",
+      "prompt": "Validate changes before commit",
+      "success_criteria": "Emphasize validation before commit",
+      "gold": {
+        "required_matches": ["mr_003"]
+      }
+    },
+    {
+      "task_id": "dt_03",
+      "family": "direct_trigger",
+      "difficulty": "easy",
+      "corpus_id": "metadata_rich",
+      "prompt": "Viewer must expose live stale and error states",
+      "success_criteria": "Surface freshness state clearly",
+      "gold": {
+        "required_matches": ["mr_006"]
+      }
+    },
+    {
+      "task_id": "dt_04",
+      "family": "direct_trigger",
+      "difficulty": "easy",
+      "corpus_id": "metadata_rich",
+      "prompt": "Audit design spec against implementation",
+      "success_criteria": "Use canonical docs first",
+      "gold": {
+        "required_matches": ["mr_008"]
+      }
+    }
+  ]
+}

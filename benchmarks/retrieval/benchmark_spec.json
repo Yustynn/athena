@@ -1,0 +1,16 @@
+{
+  "name": "synthetic_retrieval_v1",
+  "k_values": [1, 3, 5],
+  "corpuses": [
+    "corpuses/generic_noisy.json",
+    "corpuses/metadata_rich.json",
+    "corpuses/ambiguous_similar.json",
+    "corpuses/graph_frontier.json"
+  ],
+  "task_files": [
+    "tasks/direct_trigger.json",
+    "tasks/multi_constraint.json",
+    "tasks/similar_choice.json",
+    "tasks/frontier_replacement.json"
+  ]
+}

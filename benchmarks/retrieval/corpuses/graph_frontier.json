@@ -1,0 +1,69 @@
+{
+  "corpus_id": "graph_frontier",
+  "fragments": [
+    {
+      "fragment_id": "gf_001",
+      "kind": "doctrine",
+      "summary": "Persisted runtime should merge fixture fragments with stored memory.",
+      "full_text": "Persisted runtime should merge fixture fragments with stored memory. This older guidance kept bootstrap fixture data in runtime retrieval."
+    },
+    {
+      "fragment_id": "gf_002",
+      "kind": "doctrine",
+      "summary": "Persisted runtime should use Dolt fragment nodes as canonical source.",
+      "full_text": "Persisted runtime should use Dolt fragment nodes as canonical source. Keep fixture use explicit for stateless dev flows and tests.",
+      "trigger_conditions": ["persisted", "dolt", "canonical", "fixture", "source of truth"],
+      "concept_key": "persisted-source",
+      "usefulness_score": 5,
+      "supersedes": ["gf_001"]
+    },
+    {
+      "fragment_id": "gf_003",
+      "kind": "doctrine",
+      "summary": "Show Athena history as flat fragment rows.",
+      "full_text": "Show Athena history as flat fragment rows. This older guidance flattened packet and event history."
+    },
+    {
+      "fragment_id": "gf_004",
+      "kind": "procedure",
+      "summary": "Group Athena history by packet and feedback event.",
+      "full_text": "Group Athena history by packet and feedback event. Packet timeline is clearer than flat fragment rows.",
+      "trigger_conditions": ["history", "packet", "feedback event", "timeline"],
+      "concept_key": "history-grouping",
+      "usefulness_score": 5,
+      "supersedes": ["gf_003"]
+    },
+    {
+      "fragment_id": "gf_005",
+      "kind": "procedure",
+      "summary": "Run long benchmarks once purpose sounds roughly right.",
+      "full_text": "Run long benchmarks once purpose sounds roughly right. This older guidance is too permissive."
+    },
+    {
+      "fragment_id": "gf_006",
+      "kind": "procedure",
+      "summary": "Stop before long benchmark if orientation is unresolved.",
+      "full_text": "Stop before long benchmark if orientation is unresolved. Expensive work needs a clearer stop/go rule.",
+      "trigger_conditions": ["benchmark", "long run", "orientation", "unresolved", "stop"],
+      "concept_key": "benchmark-stop",
+      "usefulness_score": 5,
+      "supersedes": ["gf_005"]
+    },
+    {
+      "fragment_id": "gf_007",
+      "kind": "context",
+      "summary": "Read tests first to infer intended design.",
+      "full_text": "Read tests first to infer intended design. This older guidance over-trusts current behavior."
+    },
+    {
+      "fragment_id": "gf_008",
+      "kind": "context",
+      "summary": "Start design gap audits from schema and plan docs.",
+      "full_text": "Start design gap audits from schema and plan docs. Use docs before tests when intended design is question.",
+      "trigger_conditions": ["audit", "design spec", "docs", "tests", "plan"],
+      "concept_key": "audit-start",
+      "usefulness_score": 5,
+      "supersedes": ["gf_007"]
+    }
+  ]
+}

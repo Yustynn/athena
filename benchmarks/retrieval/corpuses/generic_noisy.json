@@ -1,0 +1,77 @@
+{
+  "corpus_id": "generic_noisy",
+  "fragments": [
+    {
+      "fragment_id": "gn_001",
+      "kind": "doctrine",
+      "summary": "Keep Athena retrieval deterministic and inspectable.",
+      "full_text": "Keep Athena retrieval deterministic and inspectable. Stable ranking and visible reasoning help debugging."
+    },
+    {
+      "fragment_id": "gn_002",
+      "kind": "pitfall",
+      "summary": "Do not skip feedback when changing memory selection.",
+      "full_text": "Do not skip feedback when changing memory selection. Retrieval changes should still be judged explicitly."
+    },
+    {
+      "fragment_id": "gn_003",
+      "kind": "procedure",
+      "summary": "Validate state before commit or merge.",
+      "full_text": "Validate state before commit or merge. Check persisted state and retrieval outputs before closing work."
+    },
+    {
+      "fragment_id": "gn_004",
+      "kind": "context",
+      "summary": "Design docs often help orient architecture work.",
+      "full_text": "Design docs often help orient architecture work. They can reduce guessing during implementation."
+    },
+    {
+      "fragment_id": "gn_005",
+      "kind": "procedure",
+      "summary": "Viewer refresh should stay fast under repeated polling.",
+      "full_text": "Viewer refresh should stay fast under repeated polling. Operators should not wait long for repeated inspection."
+    },
+    {
+      "fragment_id": "gn_006",
+      "kind": "doctrine",
+      "summary": "Internal tools should show status clearly.",
+      "full_text": "Internal tools should show status clearly. Freshness and failure state should be visible to operators."
+    },
+    {
+      "fragment_id": "gn_007",
+      "kind": "doctrine",
+      "summary": "Separate current working set from larger store when useful.",
+      "full_text": "Separate current working set from larger store when useful. Users may confuse packet and total memory otherwise."
+    },
+    {
+      "fragment_id": "gn_008",
+      "kind": "context",
+      "summary": "Tests can reveal current behavior quickly.",
+      "full_text": "Tests can reveal current behavior quickly. They may help orient debugging even when they are not canonical."
+    },
+    {
+      "fragment_id": "gn_009",
+      "kind": "procedure",
+      "summary": "Cached responses can reduce refresh cost.",
+      "full_text": "Cached responses can reduce refresh cost. Repeated read paths sometimes benefit from a cache."
+    },
+    {
+      "fragment_id": "gn_010",
+      "kind": "doctrine",
+      "summary": "Use durable state as source of truth for runtime memory.",
+      "full_text": "Use durable state as source of truth for runtime memory. Runtime state should not drift from persisted state."
+    },
+    {
+      "fragment_id": "gn_011",
+      "kind": "context",
+      "summary": "Weak memory inventory can hide retrieval quality.",
+      "full_text": "Weak memory inventory can hide retrieval quality. Bad corpus quality can look like bad ranking."
+    },
+    {
+      "fragment_id": "gn_012",
+      "kind": "procedure",
+      "summary": "Long operations should have explicit stop rules.",
+      "full_text": "Long operations should have explicit stop rules. Expensive work should not start from vague orientation."
+    }
+  ]
+}

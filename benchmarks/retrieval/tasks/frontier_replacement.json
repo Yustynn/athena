@@ -1,0 +1,53 @@
+{
+  "family": "frontier_replacement",
+  "tasks": [
+    {
+      "task_id": "fr_01",
+      "family": "frontier_replacement",
+      "difficulty": "medium",
+      "corpus_id": "graph_frontier",
+      "prompt": "Persisted Athena source of truth",
+      "success_criteria": "Use Dolt fragment nodes, not fixture merge",
+      "gold": {
+        "required_matches": ["gf_002"],
+        "preferred_order": ["gf_002", "gf_001"]
+      }
+    },
+    {
+      "task_id": "fr_02",
+      "family": "frontier_replacement",
+      "difficulty": "medium",
+      "corpus_id": "graph_frontier",
+      "prompt": "Inspect Athena history viewer",
+      "success_criteria": "Group history by packet and feedback event",
+      "gold": {
+        "required_matches": ["gf_004"],
+        "preferred_order": ["gf_004", "gf_003"]
+      }
+    },
+    {
+      "task_id": "fr_03",
+      "family": "frontier_replacement",
+      "difficulty": "hard",
+      "corpus_id": "graph_frontier",
+      "prompt": "Plan long benchmark execution",
+      "success_criteria": "Stop before benchmark if orientation remains unresolved",
+      "gold": {
+        "required_matches": ["gf_006"],
+        "preferred_order": ["gf_006", "gf_005"]
+      }
+    },
+    {
+      "task_id": "fr_04",
+      "family": "frontier_replacement",
+      "difficulty": "hard",
+      "corpus_id": "graph_frontier",
+      "prompt": "Audit design-spec drift",
+      "success_criteria": "Start from docs, not tests",
+      "gold": {
+        "required_matches": ["gf_008"],
+        "preferred_order": ["gf_008", "gf_007"]
+      }
+    }
+  ]
+}
