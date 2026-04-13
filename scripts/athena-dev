@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+fixture_path="$repo_root/.athena/fragments.json"
+
+usage() {
+  cat <<'EOF'
+usage:
+  scripts/athena-dev packet --prompt "..." --success-criteria "..."
+  scripts/athena-dev check-orientation request.json
+  scripts/athena-dev apply-feedback request.json
+
+short forms:
+  scripts/athena-dev packet "prompt" "success criteria"
+  scripts/athena-dev check-orientation -
+  scripts/athena-dev apply-feedback -
+
+request file for check-orientation must look like:
+  {"kind":"check_orientation","purpose":{...},"packet":{...},"response":{...}}
+
+request file for apply-feedback must look like:
+  {"kind":"apply_feedback","purpose":{...},"packet":{...},"feedback":{...}}
+EOF
+}
+
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "missing command: $1"
+}
+
+run_stdio() {
+  local request_json="$1"
+  require_command cargo
+  printf '%s' "$request_json" | cargo run --quiet --bin athena-stdio -- --fixture "$fixture_path"
+}
+
+read_lines_into_array() {
+  local target_name="$1"
+  shift
+
+  local line
+  local values=()
+  while IFS= read -r line; do
+    values+=("$line")
+  done < <("$@")
+
+  eval "$target_name=()"
+  local index
+  local quoted
+  for index in "${!values[@]}"; do
+    printf -v quoted '%q' "${values[$index]}"
+    eval "$target_name[$index]=$quoted"
+  done
+}
+
+read_input_path() {
+  local input_path="${1:-"-"}"
+  if [[ "$input_path" == "-" ]]; then
+    cat
+  else
+    [[ -f "$input_path" ]] || die "missing input file: $input_path"
+    cat "$input_path"
+  fi
+}
+
+parse_prompt_success() {
+  local prompt=""
+  local success_criteria=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --prompt)
+        [[ $# -ge 2 ]] || die "--prompt requires value"
+        prompt="$2"
+        shift 2
+        ;;
+      --success-criteria)
+        [[ $# -ge 2 ]] || die "--success-criteria requires value"
+        success_criteria="$2"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        if [[ -z "$prompt" ]]; then
+          prompt="$1"
+        elif [[ -z "$success_criteria" ]]; then
+          success_criteria="$1"
+        else
+          die "unexpected argument: $1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  [[ -n "$prompt" ]] || die "prompt is required"
+  [[ -n "$success_criteria" ]] || die "success criteria is required"
+
+  printf '%s\n%s\n' "$prompt" "$success_criteria"
+}
+
+build_packet_request() {
+  local prompt="$1"
+  local success_criteria="$2"
+  PROMPT="$prompt" SUCCESS_CRITERIA="$success_criteria" ruby -rjson <<'RUBY'
+puts JSON.generate(
+  "kind" => "assemble_packet",
+  "prompt" => ENV.fetch("PROMPT"),
+  "success_criteria" => ENV.fetch("SUCCESS_CRITERIA"),
+)
+RUBY
+}
+
+command_name="${1:-}"
+if [[ -z "$command_name" ]]; then
+  usage
+  exit 1
+fi
+shift
+
+case "$command_name" in
+  packet)
+    read_lines_into_array parsed parse_prompt_success "$@"
+    request_json="$(build_packet_request "${parsed[0]}" "${parsed[1]}")"
+    run_stdio "$request_json"
+    ;;
+  check-orientation|orient)
+    request_json="$(read_input_path "${1:-"-"}")"
+    run_stdio "$request_json"
+    ;;
+  apply-feedback)
+    request_json="$(read_input_path "${1:-"-"}")"
+    run_stdio "$request_json"
+    ;;
+  --help|-h|help)
+    usage
+    ;;
+  *)
+    die "unknown command: $command_name"
+    ;;
+esac

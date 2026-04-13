@@ -18,10 +18,4 @@ fi
 
 bd version
 
-if command -v codex >/dev/null 2>&1; then
-  if [[ "${ATHENA_INSTALL_DEV_MCP:-0}" == "1" ]]; then
-    bash scripts/install_codex_athena_mcp.sh --with-dev
-  else
-    bash scripts/install_codex_athena_mcp.sh
-  fi
-fi
+chmod +x scripts/athena scripts/athena-dev scripts/athena_check.sh
