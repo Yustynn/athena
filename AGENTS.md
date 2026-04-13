@@ -174,6 +174,10 @@ bd close <id>         # Complete work
 
 ## Athena Check Workflow
 
+Benchmark workflow lives in `docs/testing.md`.
+- use it for retrieval benchmark commands, synthetic creation benchmark commands, fixture layout, and optional blinded subagent sanity-check flow
+- update it when benchmark shape or commands change
+
 Run this before session close to verify core Athena persistence and feedback-loop behavior:
 
 ```bash
